@@ -1,0 +1,10 @@
+An introduction to Docker and how it might be used by the WAVEWATCH III community
+
+Docker is lightweight, easy to use virtualization environment to deliver software in packages called containers. 
+Containers are isolated from one another as well as the host OS and bundle their own software, 
+libraries and configuration files. Containers offer some compelling features in the context of both development 
+environments and operational deployment. Tom will give a brief overview of how Ocean Numerical currently uses Docker, 
+and how it might be used in the context of WAVEWATCH III development. 
+
+Ocean Numerical have also developed an open-source python wave spectral processing library that may be of interest 
+to this group. Tom will give a brief overview of its features and current development plans. 
