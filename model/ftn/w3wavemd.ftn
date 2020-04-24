@@ -442,6 +442,7 @@
                                  DELX, DELY, DELA, DEPTH, D50, PSIC
      REAL                     :: VSioDummy(NSPEC), VDioDummy(NSPEC), VAoldDummy(NSPEC)
      LOGICAL                  :: SHAVETOTioDummy
+     LOGICAL                  :: FLRST2
 !/SEC1     REAL                    :: DTGTEMP
 !
       REAL, ALLOCATABLE       :: FIELD(:)
@@ -2372,6 +2373,10 @@
                   TOUT(:) = TONEXT(:,J)
                   DTTST   = DSEC21 ( TIME, TOUT )
 !
+! Flag to switch off second restart when time coincides with first restart.
+! Default is true, switch to false if first restart active
+                  FLRST2=.TRUE.
+!
                   IF ( DTTST .EQ. 0. ) THEN
                       IF ( ( J .EQ. 1 ) .OR. ( J .EQ. 7 ) ) THEN
                           IF ( IAPROC .EQ. NAPFLD ) THEN
@@ -2429,6 +2434,7 @@
 !
                           CALL W3IOTR ( NDS(11), NDS(12), VA, IMOD )
                         ELSE IF ( J .EQ. 4 ) THEN
+                          FLRST2=.FALSE.
                           CALL W3IORS ('HOT', NDS(6), XXX, IMOD, FLOUT(8) )
                           ITEST = RSTYPE
                         ELSE IF ( J .EQ. 5 ) THEN
@@ -2477,7 +2483,7 @@
 
 ! If there is a second stream of restart files then J=8 and FLOUT(8)=.TRUE.
             J=8
-            IF ( FLOUT(J) ) THEN
+            IF ( FLOUT(J) .AND. FLRST2 ) THEN
 !
 !/DEBUGRUN      WRITE(740+IAPROC,*) 'Matching FLOUT(J)'
 !/DEBUGRUN      FLUSH(740+IAPROC)
