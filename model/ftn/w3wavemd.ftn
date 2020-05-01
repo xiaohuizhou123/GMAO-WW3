@@ -2302,7 +2302,7 @@
 !
 !/DEBUGRUN      WRITE(740+IAPROC,*) 'After DO_OUTPUT_EXCHANGES, step 2'
 !/DEBUGRUN      FLUSH(740+IAPROC)
-!/MPI            IF ( FLOUT(8) .AND. NRQRS.NE.0 ) THEN
+!/MPI            IF ( ( FLOUT(8) .AND. NRQRS.NE.0 ) .AND. FLRST2 ) THEN
 !/MPI                IF ( DSEC21(TIME,TONEXT(:,8)).EQ.0. ) THEN
 !/MPI                    CALL MPI_STARTALL ( NRQRS, IRQRS , IERR_MPI )
 !/MPI                    FLGMPI(8) = .TRUE.
