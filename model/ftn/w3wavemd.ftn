@@ -2291,8 +2291,10 @@
 !
 !/DEBUGRUN      WRITE(740+IAPROC,*) 'After DO_OUTPUT_EXCHANGES, step 2'
 !/DEBUGRUN      FLUSH(740+IAPROC)
+!/MPI            FLRST2=.TRUE.
 !/MPI            IF ( FLOUT(4) .AND. NRQRS.NE.0 ) THEN
 !/MPI                IF ( DSEC21(TIME,TONEXT(:,4)).EQ.0. ) THEN
+!/MPI                    FLRST2=.FALSE.
 !/MPI                    CALL MPI_STARTALL ( NRQRS, IRQRS , IERR_MPI )
 !/MPI                    FLGMPI(4) = .TRUE.
 !/MPI                    NRQMAX    = MAX ( NRQMAX , NRQRS )
