@@ -1,4 +1,6 @@
 #include "w3macros.h"
+#include "MAPL_Generic.h"
+
 !/
 !/ ------------------------------------------------------------------- /
 !/ Macros for ESMF logging
@@ -39,7 +41,7 @@
 #define TEST_WMESMFMD_STOKES3D___disabled
 !/
 !/ ------------------------------------------------------------------- /
-      module WMESMFMD
+      module WMMAPLMD
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -134,9 +136,8 @@
 ! --- ESMF Module
       use ESMF
 
-! --- NUOPC modules
-      use NUOPC
-      use NUOPC_Model, parent_SetServices => SetServices
+! --- MAPL module
+      MAPL_Mod
 
 ! --- WW3 modules
       use CONSTANTS
@@ -195,7 +196,7 @@
       real(ESMF_KIND_RX) :: missingValue
 !
 ! --- Timing
-      integer, parameter :: numwt=8
+      integer, parameter :: numwt=5
       character(32) :: wtnam(numwt)
       integer       :: wtcnt(numwt)
       real(8)       :: wtime(numwt)
@@ -303,12 +304,10 @@
 !
 !      Name            Type   Module    Description
 !     ----------------------------------------------------------------
-!      InitializeP0    Subr.  WMESMFMD  Wave model NUOPC/ESMF Initialize phase 0
-!      InitializeP1    Subr.  WMESMFMD  Wave model NUOPC/ESMF Initialize phase 1
-!      InitializeP3    Subr.  WMESMFMD  Wave model NUOPC/ESMF Initialize phase 3
-!      Finalize        Subr.  WMESMFMD  Wave model NUOPC/ESMF Finalize
-!      DataInitialize  Subr.  WMESMFMD  Wave model NUOPC/ESMF Data Initialize
-!      ModelAdvance    Subr.  WMESMFMD  Wave model NUOPC/ESMF Model Advance
+!      Initialize      Subr.  WMMAPLMD  Wave model MAPL/ESMF Initialize
+!      Finalize        Subr.  WMMAPLMD  Wave model MAPL/ESMF Finalize
+!      DataInitialize  Subr.  WMMAPLMD  Wave model MAPL/ESMF Data Initialize
+!      ModelAdvance    Subr.  WMMAPLMD  Wave model MAPL/ESMF Model Advance
 !     ----------------------------------------------------------------
 !
 !  5. Called by :
@@ -334,7 +333,13 @@
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      !NONE
+      character(len=ESMF_MAXSTR)      :: Iam
+      integer                         :: status
+      character(len=ESMF_MAXSTR)      :: COMP_NAME
+
+      type(MAPL_MetaComp),  pointer   :: MAPL
+      type(ESMF_Config)               :: CF     ! global config
+
 !
 ! -------------------------------------------------------------------- /
 ! Prep
@@ -343,85 +348,112 @@
 
 ! --- Initialize wallclock timers
 
-      wtnam( 1) = 'InitializeP0'
-      wtnam( 2) = 'InitializeP1'
-      wtnam( 3) = 'InitializeP3'
-      wtnam( 4) = 'DataInitialize'
-      wtnam( 5) = 'ModelAdvance'
-      wtnam( 6) = 'Finalize'
-      wtnam( 7) = 'GetImport'
-      wtnam( 8) = 'SetExport'
+      wtnam( 1) = 'Initialize'
+      wtnam( 2) = 'ModelAdvance'
+      wtnam( 3) = 'Finalize'
+      wtnam( 4) = 'GetImport'
+      wtnam( 5) = 'SetExport'
       wtcnt( :) = 0
       wtime( :) = 0d0
 !
 ! -------------------------------------------------------------------- /
-! 1.  NUOPC model component will register the generic methods
+!     Get my name and set-up traceback handle
 !
-      call NUOPC_CompDerive(gcomp, parent_SetServices, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-!
-! -------------------------------------------------------------------- /
-! 2.  Set model entry points
-!
-! --- Initialize - phase 0 (requires use of ESMF method)
+      Iam = 'SetServices'
 
-      call ESMF_GridCompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
-        userRoutine=InitializeP0, phase=0, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+      call ESMF_GridCompGet(GC, NAME=COMP_NAME, rc=status)
+      VERIFY_(status)
 
-! --- Set entry points for initialize methods
-
-      ! >= IPDv03 supports satisfying inter-model data dependencies and
-      ! the transfer of ESMF Grid & Mesh objects between Model and/or
-      ! Mediator components during initialization
-      ! IPDv03p1: advertise import & export fields
-      call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
-        phaseLabelList=(/"IPDv03p1"/), userRoutine=InitializeP1, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      ! IPDv03p2: unspecified by NUOPC -- not required
-      ! IPDv03p3: realize import & export fields
-      call NUOPC_CompSetEntryPoint(gcomp, ESMF_METHOD_INITIALIZE, &
-        phaseLabelList=(/"IPDv03p3"/), userRoutine=InitializeP3, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      ! IPDv03p4: relevant for TransferActionGeomObject=="accept"
-      ! IPDv03p5: relevant for TransferActionGeomObject=="accept"
-      ! IPDv03p6: check compatibility of fields connected status
-      ! IPDv03p7: handle field data initialization
-
+      Iam = trim(COMP_NAME) // Iam
+ 
 !
 ! -------------------------------------------------------------------- /
-! 3.  Register specializing methods
+!     Set model entry points
 !
-! --- Model initialize export data method
 
-      call NUOPC_CompSpecialize(gcomp, specLabel=label_DataInitialize, &
-        specRoutine=DataInitialize, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+! --- Set entry points for initialize method
+      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_INITIALIZE, Initialize, rc=status)
+      VERIFY_(status)
 
-! --- Model checkImport method (overriding default)
-
-      call ESMF_MethodRemove(gcomp, label_CheckImport, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      call NUOPC_CompSpecialize(gcomp, specLabel=label_CheckImport, &
-        specRoutine=NUOPC_NoOp, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      
 ! --- Model advance method
-
-      call NUOPC_CompSpecialize(gcomp, specLabel=label_Advance, &
-        specRoutine=ModelAdvance, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_RUN, Run, rc=status)
+      VERIFY_(status)
 
 ! --- Model finalize method
+      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_FINALIZE, Finalize, rc=status)
+      VERIFY_(status)
 
-      call NUOPC_CompSpecialize(gcomp, specLabel=label_Finalize, &
-        specRoutine=Finalize, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+!
+! -------------------------------------------------------------------- /
+!     Set state variable specs
+!
+
+! --- INTERNAL STATE:
+!     /NONE
+
+! --- IMPORT STATE:
+
+      call MAPL_AddImportSpec(GC,                                  &
+          SHORT_NAME     = 'U10M',                                 &
+          LONG_NAME      = '10-meter_eastward_wind',               &
+          UNITS          = 'm s-1',                                &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,                     &
+          RESTART        = MAPL_RestartSkip,        __RC__) 
+  
+      call MAPL_AddImportSpec(GC,                                  &
+          SHORT_NAME     = 'V10M',                                 &
+          LONG_NAME      = '10-meter_northward_wind',              &
+          UNITS          = 'm s-1',                                &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,                     &
+          RESTART        = MAPL_RestartSkip,        __RC__)
+
+      call MAPL_AddImportSpec(GC,                                  &
+          SHORT_NAME     = 'FRACI',                                &
+          LONG_NAME      = 'ice_covered_fraction_of_tile',         &
+          UNITS          = '1',                                    &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,                     &
+          RESTART        = MAPL_RestartSkip,        __RC__)
+
+
+! --- EXPORT STATE:
+      call MAPL_AddExportSpec(GC,                                  &
+           SHORT_NAME     = 'CHARNOCK',                            &
+           LONG_NAME      = 'wave_model_charnock_coefficient',     &
+           UNITS          = '1',                                   &
+           DIMS           = MAPL_DimsHorzOnly,                     &
+           VLOCATION      = MAPL_VLocationNone,     __RC__) 
+     
+      call MAPL_AddExportSpec(GC,                                  &
+           SHORT_NAME     = 'Z0',                                  &
+           LONG_NAME      = 'surface_roughness',                   &
+           UNITS          = 'm',                                   &
+           DIMS           = MAPL_DimsHorzOnly,                     &
+           VLOCATION      = MAPL_VLocationNone,     __RC__) 
+
+!
+! -------------------------------------------------------------------- /
+!     Set profiling timers
+!
+      call MAPL_TimerAdd(GC, name='TOTAL'        , __RC__)
+      call MAPL_TimerAdd(GC, name='INITIALIZE'   , __RC__)
+      call MAPL_TimerAdd(GC, name='RUN'          , __RC__)
+      call MAPL_TimerAdd(GC, name='FINALIZE'     , __RC__)
+
+!
+! -------------------------------------------------------------------- /
+!     Set profiling timers
+!
+      call MAPL_GenericSetServices(GC, __RC__)
+
 !
 ! -------------------------------------------------------------------- /
 ! Post
 !
-      rc = ESMF_SUCCESS
+      RETURN_(ESMF_SUCCESS)
+
 !/
 !/ End of SetServices ------------------------------------------------ /
 !/
@@ -507,16 +539,6 @@
 ! -------------------------------------------------------------------- /
 ! Determine verbosity
 !
-      call NUOPC_CompAttributeGet(gcomp, name='Verbosity', &
-        value=valueString, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      verbosity = ESMF_UtilString2Int( valueString, &
-        specialStringList=(/'high','max '/), &
-        specialValueList=(/    255,   255/), rc=rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': entered InitializeP0', ESMF_LOGMSG_INFO)
 !
 ! -------------------------------------------------------------------- /
 ! Define initialization phases
@@ -671,77 +693,12 @@
 !
 ! 1.c Get background model info
 !
-#if defined(COAMPS)
-      call ESMF_AttributeGet(gcomp, name="OcnBackground", &
-        value=attstr, defaultValue="none", &
-        convention="COAMPS", purpose="General", rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      includeObg = trim(attstr).eq."model"
-      call ESMF_AttributeGet(gcomp, name="AtmBackground", &
-        value=attstr, defaultValue="none", &
-        convention="COAMPS", purpose="General", rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      includeAbg = trim(attstr).eq."model"
-      call ESMF_AttributeGet(gcomp, name="IceBackground", &
-        value=attstr, defaultValue="none", &
-        convention="COAMPS", purpose="General", rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      includeIbg = trim(attstr).eq."model"
-      call ESMF_AttributeGet(gcomp, name="MissingValue", &
-        value=missingValue, defaultValue=real(0,ESMF_KIND_RX), &
-        convention="COAMPS", purpose="General", rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-#else
       includeObg = .false.
       includeAbg = .false.
       includeIbg = .false.
-#endif
 !
 ! 1.d Config input
 !
-      call ESMF_GridCompGet(gcomp, configIsPresent=configIsPresent, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      if (configIsPresent) then
-        call ESMF_GridCompGet(gcomp, config=config, rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        ! working directory
-        call ESMF_ConfigGetAttribute(config, wrkdir, &
-          label=trim(cname)//'_work_dir:', default='.', rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        ! I/O options
-        call ESMF_ConfigGetAttribute(config, ifname, &
-          label=trim(cname)//'_input_file_name:', &
-          default='ww3_multi.inp', rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        call ESMF_ConfigGetAttribute(config, lsep_ss, &
-          label=trim(cname)//'_stdo_output_to_file:', default=.false., rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        call ESMF_ConfigGetAttribute(config, lsep_st, &
-          label=trim(cname)//'_test_output_to_file:', default=.false., rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        call ESMF_ConfigGetAttribute(config, lsep_se, &
-          label=trim(cname)//'_error_output_to_file:', default=.false., rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        ! export grid id
-        call ESMF_ConfigGetAttribute(config, expGridID, &
-          label=trim(cname)//'_export_grid_id:', default=1, rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        ! realize all export flag
-        call ESMF_ConfigGetAttribute(config, realizeAllExport, &
-          label=trim(cname)//'_realize_all_export:', default=.false., rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        ! grid mask convention
-        call ESMF_ConfigGetAttribute(config, maskValueWater, &
-          label='mask_value_water:', default=DEFAULT_MASK_WATER, rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        call ESMF_ConfigGetAttribute(config, maskValueLand, &
-          label='mask_value_land:', default=DEFAULT_MASK_LAND, rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        ! z-level file
-        call ESMF_ConfigGetAttribute(config, zlfile, &
-          label=trim(cname)//'_zlevel_exp_file:', default='none', rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      endif
 !     preamb = trim(wrkdir)//'/'
       preamb = trim(preamb)//'/' !TODO: have separate paths for .inp, logs and data?
 !
@@ -1017,66 +974,18 @@
 !
 ! 5.a Advertise active import fields
 !
-      n = 0
-      do i = 1,numImpFields
-        if (.not.impFieldActive(i)) cycle
-        n = n + 1
-        call NUOPC_Advertise(impState, &
-          trim(impFieldStdName(i)), name=trim(impFieldName(i)), rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        if (.not.mbgFieldActive(i)) cycle
-        n = n + 1
-        call NUOPC_Advertise(impState, &
-          trim(mbgFieldStdName(i)), name=trim(mbgFieldName(i)), rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      enddo
 !
 ! 5.b Report advertised import fields
 !
-      write(msg,'(a,i0,a)') trim(cname)// &
-        ': List of advertised import fields(',n,'):'
-      call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-      write(msg,'(a,a5,a,a10,a3,a)') trim(cname)// &
-        ': ','index',' ','name',' ','standardName'
-      call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-      n = 0
-      do i = 1,numImpFields
-        if (.not.impFieldActive(i)) cycle
-        n = n + 1
-        write(msg,'(a,i5,a,a10,a3,a)') trim(cname)//': ',n, &
-          ' ',trim(impFieldName(i)),' ',trim(impFieldStdName(i))
-        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-        if (.not.mbgFieldActive(i)) cycle
-        n = n + 1
-        write(msg,'(a,i5,a,a10,a3,a)') trim(cname)//': ',n, &
-          ' ',trim(mbgFieldName(i)),' ',trim(mbgFieldStdName(i))
-        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-      enddo
 !
 ! -------------------------------------------------------------------- /
 ! 6.  Advertise export fields
 !
 ! 6.a Advertise all export fields
 !
-      do i = 1,numExpFields
-        call NUOPC_Advertise(expState, &
-          trim(expFieldStdName(i)), name=trim(expFieldName(i)), rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      enddo
 !
 ! 6.b Report advertised export fields
 !
-      write(msg,'(a,i0,a)') trim(cname)// &
-        ': List of advertised export fields(',numExpFields,'):'
-      call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-      write(msg,'(a,a5,a,a10,a3,a)') trim(cname)// &
-        ': ','index',' ','name',' ','standardName'
-      call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-      do i = 1,numExpFields
-        write(msg,'(a,i5,a,a10,a3,a)') trim(cname)//': ',i, &
-          ' ',trim(expFieldName(i)),' ',trim(expFieldStdName(i))
-        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-      enddo
 !
 ! -------------------------------------------------------------------- /
 ! Post
@@ -1643,8 +1552,8 @@
 !
 !      Name            Type  Module   Description
 !     ----------------------------------------------------------------
-!      GetImport       Subr. WMESMFMD Wave model get import fields
-!      SetExport       Subr. WMESMFMD Wave model set export fields
+!      GetImport       Subr. WMMAPLMD Wave model get import fields
+!      SetExport       Subr. WMMAPLMD Wave model set export fields
 !     ----------------------------------------------------------------
 !
 !  5. Called by :
@@ -1852,8 +1761,8 @@
 !
 !      Name      Type  Module   Description
 !     ----------------------------------------------------------------
-!      GetImport Subr. WMESMFMD Wave model get import fields
-!      SetExport Subr. WMESMFMD Wave model set export fields
+!      GetImport Subr. WMMAPLMD Wave model get import fields
+!      SetExport Subr. WMMAPLMD Wave model set export fields
 !      WMWAVE    Subr. WMWAVEMD Wave model run
 !     ----------------------------------------------------------------
 !
@@ -6187,6 +6096,6 @@
       end subroutine CalcStokes3D
 !/ ------------------------------------------------------------------- /
 !/
-!/ End of module WMESMFMD -------------------------------------------- /
+!/ End of module WMMAPLMD -------------------------------------------- /
 !/
-      end module WMESMFMD
+      end module WMMAPLMD
