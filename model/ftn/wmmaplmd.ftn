@@ -100,7 +100,6 @@
 !      FieldFill        Subr.  Private  Fill ESMF field
 !      FieldGather      Subr.  Private  Gather ESMF field
 !      FieldIndex       Func.  Private  Return field index
-!      PrintTimers      Subr.  Private  Print wallclock timers
 !      CalcDecomp       Subr.  Private  Calculate a 2D processor layout
 !      GetEnvValue      Subr.  Private  Get value of env. variable
 !      GetZlevels       Subr.  Private  Get z-levels from file for SDC
@@ -194,12 +193,6 @@
       character(ESMF_MAXSTR) :: msg
       real(ESMF_KIND_RX) :: zeroValue
       real(ESMF_KIND_RX) :: missingValue
-!
-! --- Timing
-      integer, parameter :: numwt=5
-      character(32) :: wtnam(numwt)
-      integer       :: wtcnt(numwt)
-      real(8)       :: wtime(numwt)
 !
 ! --- Import fields
       type(ESMF_ArraySpec)          :: impArraySpec2D
@@ -346,15 +339,6 @@
 !
       rc = ESMF_SUCCESS
 
-! --- Initialize wallclock timers
-
-      wtnam( 1) = 'Initialize'
-      wtnam( 2) = 'ModelAdvance'
-      wtnam( 3) = 'Finalize'
-      wtnam( 4) = 'GetImport'
-      wtnam( 5) = 'SetExport'
-      wtcnt( :) = 0
-      wtime( :) = 0d0
 !
 ! -------------------------------------------------------------------- /
 !     Get my name and set-up traceback handle
@@ -460,8 +444,8 @@
       end subroutine SetServices
 !/ ------------------------------------------------------------------- /
 #undef METHOD
-#define METHOD "InitializeP0"
-      subroutine InitializeP0 ( gcomp, impState, expState, extClock, rc )
+#define METHOD "Initialize"
+      subroutine Initialize ( gcomp, impState, expState, extClock, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -552,9 +536,6 @@
 ! Post
 !
       rc = ESMF_SUCCESS
-      call ESMF_VMWtime(wftime)
-      wtime(iwt) = wtime(iwt) + wftime - wstime
-      wtcnt(iwt) = wtcnt(iwt) + 1
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': leaving InitializeP0', ESMF_LOGMSG_INFO)
 !/
@@ -991,9 +972,6 @@
 ! Post
 !
       rc = ESMF_SUCCESS
-      call ESMF_VMWtime(wftime)
-      wtime(iwt) = wtime(iwt) + wftime - wstime
-      wtcnt(iwt) = wtcnt(iwt) + 1
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': leaving InitializeP1', ESMF_LOGMSG_INFO)
 !
@@ -1310,9 +1288,6 @@
 ! Post
 !
       rc = ESMF_SUCCESS
-      call ESMF_VMWtime(wftime)
-      wtime(iwt) = wtime(iwt) + wftime - wstime
-      wtcnt(iwt) = wtcnt(iwt) + 1
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': leaving InitializeP3', ESMF_LOGMSG_INFO)
 !/
@@ -1501,10 +1476,6 @@
 ! -------------------------------------------------------------------- /
 ! Post
 !
-      call ESMF_VMWtime(wftime)
-      wtime(iwt) = wtime(iwt) + wftime - wstime
-      wtcnt(iwt) = wtcnt(iwt) + 1
-      call PrintTimers(trim(cname), wtnam, wtcnt, wtime)
       rc = ESMF_SUCCESS
       if ( improc .eq. nmpscr ) write (*,999)
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
@@ -1720,9 +1691,6 @@
 ! Post
 !
 1     rc = ESMF_SUCCESS
-      call ESMF_VMWtime(wftime)
-      wtime(iwt) = wtime(iwt) + wftime - wstime
-      wtcnt(iwt) = wtcnt(iwt) + 1
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': leaving DataInitialize', ESMF_LOGMSG_INFO)
 !/
@@ -1890,9 +1858,6 @@
       deallocate (tend, stat=rc)
       if (ESMF_LogFoundDeallocError(rc, PASSTHRU)) return
       rc = ESMF_SUCCESS
-      call ESMF_VMWtime(wftime)
-      wtime(iwt) = wtime(iwt) + wftime - wstime
-      wtcnt(iwt) = wtcnt(iwt) + 1
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': leaving ModelAdvance', ESMF_LOGMSG_INFO)
 !/
@@ -2198,9 +2163,6 @@
 #endif
       firstCall = .false.
       rc = ESMF_SUCCESS
-      call ESMF_VMWtime(wftime)
-      wtime(iwt) = wtime(iwt) + wftime - wstime
-      wtcnt(iwt) = wtcnt(iwt) + 1
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': leaving GetImport', ESMF_LOGMSG_INFO)
 !/
@@ -2378,9 +2340,6 @@
       timeSlice = timeSlice + 1
 #endif
       rc = ESMF_SUCCESS
-      call ESMF_VMWtime(wftime)
-      wtime(iwt) = wtime(iwt) + wftime - wstime
-      wtcnt(iwt) = wtcnt(iwt) + 1
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': leaving SetExport', ESMF_LOGMSG_INFO)
 !/
@@ -4727,90 +4686,6 @@
 !/ End of FieldIndex ------------------------------------------------- /
 !/
       end function FieldIndex
-!/ ------------------------------------------------------------------- /
-#undef METHOD
-#define METHOD "PrintTimers"
-      subroutine PrintTimers ( cname, wtnam, wtcnt, wtime )
-!/
-!/                  +-----------------------------------+
-!/                  | WAVEWATCH III           NOAA/NCEP |
-!/                  |        T. J. Campbell, NRL        |
-!/                  |                        FORTRAN 90 |
-!/                  | Last update :         20-Jan-2017 |
-!/                  +-----------------------------------+
-!/
-!/    20-Jan-2017 : Origination.                        ( version 6.02 )
-!/
-!  1. Purpose :
-!
-!     Print wallclock timers to ESMF log file
-!
-!  2. Method :
-!
-!  3. Parameters :
-!
-!     Parameter list
-!     ----------------------------------------------------------------
-!       cname     Str    I   Name of component
-!       wtnam     Str    I   Timer names
-!       wtcnt     Int    I   Timer counts
-!       wtime     R8     I   Timers
-!     ----------------------------------------------------------------
-!
-!  4. Subroutines used :
-!
-!      Name      Type  Module   Description
-!     ----------------------------------------------------------------
-!      NONE
-!     ----------------------------------------------------------------
-!
-!  5. Called by :
-!
-!  6. Error messages :
-!
-!  7. Remarks :
-!
-!  8. Structure :
-!
-!  9. Switches :
-!
-! 10. Source code :
-!
-!/ ------------------------------------------------------------------- /
-!/
-!/ ------------------------------------------------------------------- /
-!/ Parameter list
-!/
-      character(*) :: cname
-      character(*) :: wtnam(:)
-      integer      :: wtcnt(:)
-      real(8)      :: wtime(:)
-!/
-!/ ------------------------------------------------------------------- /
-!/ Local parameters
-!/
-      character(128) :: msg
-      integer :: k
-!
-! -------------------------------------------------------------------- /
-! Print timers to ESMF log file
-!
-      write(msg,1) trim(cname),"timer","count","time"
-      call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-      do k=lbound(wtcnt,1),ubound(wtcnt,1)
-        write(msg,2) trim(cname),trim(wtnam(k)),wtcnt(k),wtime(k)
-        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-      enddo
-!
-! -------------------------------------------------------------------- /
-! Formats
-!
-1     format(a,': wtime: ',a20,a10,a14)
-2     format(a,': wtime: ',a20,i10,e14.6)
-!/
-!/ End of PrintTimers ------------------------------------------------ /
-!/
-      end subroutine PrintTimers
 !/ ------------------------------------------------------------------- /
 #undef METHOD
 #define METHOD "CalcDecomp"
