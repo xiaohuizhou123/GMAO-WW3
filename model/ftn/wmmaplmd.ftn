@@ -428,7 +428,7 @@
 
 !
 ! -------------------------------------------------------------------- /
-!     Set profiling timers
+!     Set generic IRF methods, handle children components, etc.
 !
       call MAPL_GenericSetServices(GC, __RC__)
 
@@ -509,8 +509,6 @@
 !/
       character(ESMF_MAXSTR) :: cname
       character(ESMF_MAXSTR) :: valueString
-      integer, parameter :: iwt=1
-      real(8) :: wstime, wftime
 !
 ! -------------------------------------------------------------------- /
 ! Prep
@@ -620,8 +618,6 @@
 !/ Local parameters
 !/
       character(ESMF_MAXSTR) :: cname
-      integer, parameter :: iwt=2
-      real(8) :: wstime, wftime
       integer :: idsi, idso, idss, idst, idse
       integer :: mpiComm = -99
       logical :: configIsPresent
@@ -1054,8 +1050,6 @@
 !/ Local parameters
 !/
       character(ESMF_MAXSTR) :: cname
-      integer, parameter :: iwt=3
-      real(8) :: wstime, wftime
       integer :: i1, i2, i3, i, n
       logical :: isConnected
 !
@@ -1297,7 +1291,7 @@
 !/ ------------------------------------------------------------------- /
 #undef METHOD
 #define METHOD "Finalize"
-      subroutine Finalize ( gcomp, rc )
+      subroutine Finalize ( gcomp, impState, expState, extClock, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1320,6 +1314,9 @@
 !     Parameter list
 !     ----------------------------------------------------------------
 !       gcomp     Type   I/O Gridded component
+!       impState  Type   I/O Import state
+!       expState  Type   I/O Export state
+!       extClock  Type   I   External clock
 !       rc        Int.   O   Return code
 !     ----------------------------------------------------------------
 !
@@ -1348,14 +1345,17 @@
 !/ Parameter list
 !/
       type(ESMF_GridComp) :: gcomp
+      type(ESMF_State)    :: impState
+      type(ESMF_State)    :: expState
+      type(ESMF_Clock)    :: extClock
       integer,intent(out) :: rc
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
       character(ESMF_MAXSTR) :: cname
-      integer, parameter :: iwt=6
-      real(8) :: wstime, wftime
+      character(len=ESMF_MAXSTR) :: Iam
+      integer                    :: status
       integer :: i
 !
 ! -------------------------------------------------------------------- /
@@ -1551,8 +1551,6 @@
 !/ Local parameters
 !/
       character(ESMF_MAXSTR) :: cname
-      integer, parameter :: iwt=4
-      real(8) :: wstime, wftime
       type(ESMF_Clock) :: clock
       type(ESMF_Time) :: currTime
       logical :: fldUpdated, allUpdated
@@ -1758,8 +1756,6 @@
 !/ Local parameters
 !/
       character(ESMF_MAXSTR) :: cname
-      integer, parameter :: iwt=5
-      real(8) :: wstime, wftime
       integer :: stat, imod, tcur(2)
       integer, allocatable :: tend(:,:)
       integer(ESMF_KIND_I4) :: yy,mm,dd,h,m,s
@@ -1927,8 +1923,6 @@
       character(500) :: msg
       integer :: k
 !AW ---TEST-TEST-TEST---------------------------
-      integer, parameter :: iwt=7
-      real(8) :: wstime, wftime
       integer :: i1, i2, i3, j, imod, jmod
       logical, save :: firstCall = .true.
       integer :: tcur(2), tend(2)
@@ -2229,8 +2223,6 @@
 !/ Local parameters
 !/
       character(ESMF_MAXSTR) :: cname
-      integer, parameter :: iwt=8
-      real(8) :: wstime, wftime
       integer :: i1, i2, i3
       logical :: flpart = .false., floutg = .false., floutg2 = .true.
 #if defined(TEST_WMESMFMD) || defined(TEST_WMESMFMD_SETEXPORT)
