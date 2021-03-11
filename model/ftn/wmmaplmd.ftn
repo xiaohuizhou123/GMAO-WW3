@@ -136,7 +136,7 @@
       use ESMF
 
 ! --- MAPL module
-      MAPL_Mod
+      use MAPL_Mod
 
 ! --- WW3 modules
       use CONSTANTS
@@ -268,7 +268,7 @@
 !/ ------------------------------------------------------------------- /
 #undef METHOD
 #define METHOD "SetServices"
-      subroutine SetServices ( gcomp, rc )
+      subroutine SetServices ( gc, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -289,7 +289,7 @@
 !
 !     Parameter list
 !     ----------------------------------------------------------------
-!       gcomp   Type   I/O Gridded component
+!       gc   Type   I/O Gridded component
 !       rc      Int.   O   Return code
 !     ----------------------------------------------------------------
 !
@@ -320,7 +320,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      type(ESMF_GridComp) :: gcomp
+      type(ESMF_GridComp) :: gc
       integer,intent(out) :: rc
 !/
 !/ ------------------------------------------------------------------- /
@@ -360,7 +360,8 @@
       VERIFY_(status)
 
 ! --- Model advance method
-      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_RUN, Run, rc=status)
+!ALT, we should use Run, but for first cut ModelAdvance is fine      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_RUN, Run, rc=status)
+      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_RUN, ModelAdvance, rc=status)
       VERIFY_(status)
 
 ! --- Model finalize method
@@ -445,7 +446,7 @@
 !/ ------------------------------------------------------------------- /
 #undef METHOD
 #define METHOD "Initialize"
-      subroutine Initialize ( gcomp, impState, expState, extClock, rc )
+      subroutine Initialize ( gc, impState, expState, extClock, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -467,7 +468,7 @@
 !
 !     Parameter list
 !     ----------------------------------------------------------------
-!       gcomp     Type   I/O Gridded component
+!       gc     Type   I/O Gridded component
 !       impState  Type   I/O Import state
 !       expState  Type   I/O Export state
 !       extClock  Type   I   External clock
@@ -480,93 +481,12 @@
 !     ----------------------------------------------------------------
 !      NONE
 !     ----------------------------------------------------------------
-!
-!  5. Called by :
-!
-!  6. Error messages :
-!
-!  7. Remarks :
-!
-!  8. Structure :
-!
-!  9. Switches :
-!
-! 10. Source code :
-!
-!/ ------------------------------------------------------------------- /
-!/
-!/ ------------------------------------------------------------------- /
-!/ Parameter list
-!/
-      type(ESMF_GridComp) :: gcomp
-      type(ESMF_State)    :: impState
-      type(ESMF_State)    :: expState
-      type(ESMF_Clock)    :: extClock
-      integer,intent(out) :: rc
-!/
-!/ ------------------------------------------------------------------- /
-!/ Local parameters
-!/
-      character(ESMF_MAXSTR) :: cname
-      character(ESMF_MAXSTR) :: valueString
-!
-! -------------------------------------------------------------------- /
-! Prep
-!
-      rc = ESMF_SUCCESS
-      call ESMF_VMWtime(wstime)
-      call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-!
-! -------------------------------------------------------------------- /
-! Determine verbosity
-!
-!
-! -------------------------------------------------------------------- /
-! Define initialization phases
-! * switch to IPDv03 by filtering all other phaseMap entries
-!
-      call NUOPC_CompFilterPhaseMap(gcomp, ESMF_METHOD_INITIALIZE, &
-        acceptStringList=(/"IPDv03p"/), rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-!
-! -------------------------------------------------------------------- /
-! Post
-!
-      rc = ESMF_SUCCESS
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': leaving InitializeP0', ESMF_LOGMSG_INFO)
-!/
-!/ End of InitializeP0 ----------------------------------------------- /
-!/
-      end subroutine InitializeP0
-!/ ------------------------------------------------------------------- /
-#undef METHOD
-#define METHOD "InitializeP1"
-      subroutine InitializeP1 ( gcomp, impState, expState, extClock, rc )
-!/
-!/                  +-----------------------------------+
-!/                  | WAVEWATCH III           NOAA/NCEP |
-!/                  |        T. J. Campbell, NRL        |
-!/                  |                        FORTRAN 90 |
-!/                  | Last update :         09-Aug-2017 |
-!/                  +-----------------------------------+
-!/
-!/    20-Jan-2017 : Origination.                        ( version 6.02 )
-!/    09-Aug-2017 : Add ocean forcing export fields     ( version 6.03 )
-!/
-!  1. Purpose :
-!
-!     Initialize wave model (phase 1)
-!     * Advertise fields in import and export states.
-!
-!  2. Method :
-!
+
 !  3. Parameters :
 !
 !     Parameter list
 !     ----------------------------------------------------------------
-!       gcomp     Type   I/O Gridded component
+!       gc     Type   I/O Gridded component
 !       impState  Type   I/O Import state
 !       expState  Type   I/O Export state
 !       extClock  Type   I   External clock
@@ -589,16 +509,6 @@
 !
 !  8. Structure :
 !
-!     ----------------------------------------------------------------
-!      1.  Initialization necessary for driver
-!        a General I/O: (implicit in WMMDATMD)
-!        b MPI environment
-!        c Identifying output to "screen" unit
-!      2.  Initialization of all wave models / grids
-!      3.  Advertise import fields
-!      4.  Advertise export fields
-!     ----------------------------------------------------------------
-!
 !  9. Switches :
 !
 ! 10. Source code :
@@ -608,16 +518,23 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      type(ESMF_GridComp) :: gcomp
+      type(ESMF_GridComp) :: gc
       type(ESMF_State)    :: impState
       type(ESMF_State)    :: expState
       type(ESMF_Clock)    :: extClock
-      integer,intent(out) :: rc
+      integer, optional, intent(out) :: rc
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
       character(ESMF_MAXSTR) :: cname
+      character(ESMF_MAXSTR) :: valueString
+
+! more local vars (from P1)
+!/
+!/ ------------------------------------------------------------------- /
+!/ Local parameters
+!/
       integer :: idsi, idso, idss, idst, idse
       integer :: mpiComm = -99
       logical :: configIsPresent
@@ -635,37 +552,44 @@
       integer :: i, j, n, istep, imod, jmod
       integer, allocatable :: cplmap(:,:)
       logical :: includeObg, includeAbg, includeIbg
+      integer :: status
 !
 ! -------------------------------------------------------------------- /
 ! Prep
 !
       rc = ESMF_SUCCESS
-      call ESMF_VMWtime(wstime)
-      call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': entered InitializeP1', ESMF_LOGMSG_INFO)
+!ALT      call ESMF_VMWtime(wstime)
+      call ESMF_GridCompGet(gc, name=cname, __RC__)
+
+
+
 !
+! -------------------------------------------------------------------- /
+!/
+!/ End of InitializeP0 ----------------------------------------------- /
+!/
+!
+! part of InitializeP1
 ! -------------------------------------------------------------------- /
 ! 1.  Initialization necessary for driver
 !
 ! 1.a Set global flag indicating that model is an ESMF Component
 !
-      is_esmf_component = .true.
+!ALT      is_esmf_component = .true.
+!ALT the next 2 line should not be needed, but I'll leave them for now
       zeroValue = real(0,ESMF_KIND_RX)
       missingValue = real(0,ESMF_KIND_RX)
 !
 !
 ! 1.b Get MPI environment from ESMF VM and set WW3 MPI related variables
 !
-      call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+      call ESMF_GridCompGet(gc, vm=vm, __RC__)
       call ESMF_VMGet(vm, petCount=npet, localPet=lpet, &
-        mpiCommunicator=mpiComm, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+        mpiCommunicator=mpiComm, __RC__)
       nmproc = npet
       improc = lpet + 1
       nmpscr = 1
+!ALT: root PE write diag message
       if ( improc .eq. nmpscr ) write (*,900)
 !
 ! 1.c Get background model info
@@ -681,17 +605,19 @@
 !
 ! 1.e Set internal start/stop time from external start/stop time
 !
-      call ESMF_ClockGet(extClock, startTime=ttmp, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      call ESMF_TimeGet(ttmp, yy=yy,mm=mm,dd=dd,h=h,m=m,s=s, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+!ALT: we need a strategy to tell WW3 how long to run
+! the existing one is bad! It keys off the stop time of the clock
+! we could use current time as start, and increment it by clock's
+! time step to set end time
+
+      call ESMF_ClockGet(extClock, currTime=ttmp, __RC__)
+      call ESMF_TimeGet(ttmp, yy=yy,mm=mm,dd=dd,h=h,m=m,s=s, __RC__)
       stime(1) = 10000*yy + 100*mm + dd
       stime(2) = 10000*h  + 100*m  + s
 
-      call ESMF_ClockGet(extClock, stopTime=ttmp, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      call ESMF_TimeGet(ttmp, yy=yy,mm=mm,dd=dd,h=h,m=m,s=s, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+      call ESMF_ClockGet(extClock, timeStep=etstep, __RC__)
+      ttmp = ttmp + etstep
+      call ESMF_TimeGet(ttmp, yy=yy,mm=mm,dd=dd,h=h,m=m,s=s, __RC__)
       etime(1) = 10000*yy + 100*mm + dd
       etime(2) = 10000*h  + 100*m  + s
 !
@@ -701,6 +627,7 @@
 ! the same unit.  After getting all the available unit numbers, close
 ! the units since they will be opened within WMINIT.
 !
+!ALT: I will leave this in place, but this is a bottleneck at large CPU count
       call ESMF_UtilIOUnitGet(idsi); open(unit=idsi, status='scratch');
       call ESMF_UtilIOUnitGet(idso); open(unit=idso, status='scratch');
       call ESMF_UtilIOUnitGet(idss); open(unit=idss, status='scratch');
@@ -727,24 +654,23 @@
 ! 2.b Check consistency between internal timestep and external
 !     timestep (coupling interval)
 !
-      call ESMF_ClockGet(extClock, timeStep=etstep, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+!ALT      call ESMF_ClockGet(extClock, timeStep=etstep, rc=rc)
+!ALT      if (ESMF_LogFoundError(rc, PASSTHRU)) return
 !
 ! 2.c Trap unsupported CPL input forcing settings
 !
+
+!ALT: check with AD how to handle this
       if ( any(inpmap.lt.0) ) then
         if ( nrgrd.gt.1 ) then
           if ( any(inpmap.eq.-999) ) then
             write (msg,'(a)') 'CPL input forcing defined on a '// &
               'native grid is not supported with multiple model grids'
             if ( improc .eq. nmpscr ) write (idse,'(a)') trim(msg)
-            call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_ERROR)
-            rc = ESMF_FAILURE
-            return
+            _ASSERT(.false., trim(msg))
           endif
         endif
-        allocate (cplmap(nrgrd,jfirst:8), stat=rc)
-        if (ESMF_LogFoundAllocError(rc, PASSTHRU)) return
+        allocate (cplmap(nrgrd,jfirst:8), __STAT__)
         jmod = minval(inpmap)
         cplmap = inpmap
         where ( inpmap.lt.0 ) cplmap = jmod
@@ -752,224 +678,21 @@
           write (msg,'(a)') 'All CPL input forcing must be '// &
             'defined on the same grid'
           if ( improc .eq. nmpscr ) write (idse,'(a)') trim(msg)
-          call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_ERROR)
-          rc = ESMF_FAILURE
-          return
+          _ASSERT(.false., trim(msg))
         endif
-        deallocate (cplmap, stat=rc)
-        if (ESMF_LogFoundDeallocError(rc, PASSTHRU)) return
+        deallocate (cplmap, __STAT__)
       endif
 !
 ! -------------------------------------------------------------------- /
 ! 3.  Initialize import field list
 !
-      istep_import: do istep = 1, 2
-      
-      if ( istep.eq.2 ) then
-        allocate ( impFieldName(numImpFields), &
-                   impFieldStdName(numImpFields), &
-                   impFieldInitRqrd(numImpFields), &
-                   impFieldActive(numImpFields), &
-                   impField(numImpFields), &
-                   stat=rc )
-        if (ESMF_LogFoundAllocError(rc, PASSTHRU)) return
-        allocate ( mbgFieldName(numImpFields), &
-                   mbgFieldStdName(numImpFields), &
-                   mbgFieldActive(numImpFields), &
-                   mbgField(numImpFields), &
-                   bmskField(numImpFields), &
-                   stat=rc )
-        if (ESMF_LogFoundAllocError(rc, PASSTHRU)) return
-        impFieldActive(:) = .false.
-      endif
-      i = 0
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        j = 1
-        impFieldActive(i)   = any(inpmap(:,j).lt.0)
-        impFieldName(i)     = 'seahgt'
-        impFieldStdName(i)  = 'sea_surface_height_above_sea_level'
-        impFieldInitRqrd(i) = .true.
-        mbgFieldActive(i)   = impFieldActive(i).and.includeObg
-      endif
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        j = 2
-        impFieldActive(i)   = any(inpmap(:,j).lt.0)
-        impFieldName(i)     = 'uucurr'
-        impFieldStdName(i)  = 'surface_eastward_sea_water_velocity'
-        impFieldInitRqrd(i) = .true.
-        mbgFieldActive(i)   = impFieldActive(i).and.includeObg
-      endif
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        j = 2
-        impFieldActive(i)   = any(inpmap(:,j).lt.0)
-        impFieldName(i)     = 'vvcurr'
-        impFieldStdName(i)  = 'surface_northward_sea_water_velocity'
-        impFieldInitRqrd(i) = .true.
-        mbgFieldActive(i)   = impFieldActive(i).and.includeObg
-      endif
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        j = 3
-        impFieldActive(i)   = any(inpmap(:,j).lt.0)
-        impFieldName(i)     = 'uutrue'
-        impFieldStdName(i)  = 'surface_eastward_sea_water_velocity'
-        impFieldInitRqrd(i) = .true.
-        mbgFieldActive(i)   = impFieldActive(i).and.includeAbg
-      endif
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        j = 3
-        impFieldActive(i)   = any(inpmap(:,j).lt.0)
-        impFieldName(i)     = 'vvtrue'
-        impFieldStdName(i)  = 'surface_northward_sea_water_velocity'
-        impFieldInitRqrd(i) = .true.
-        mbgFieldActive(i)   = impFieldActive(i).and.includeAbg
-      endif
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        j = 4
-        impFieldActive(i)   = any(inpmap(:,j).lt.0)
-        impFieldName(i)     = 'seaice'
-        impFieldStdName(i)  = 'precipitation_flux'
-        impFieldInitRqrd(i) = .true.
-        mbgFieldActive(i)   = impFieldActive(i).and.includeIbg
-      endif
-
-      numImpFields = i
-      enddo istep_import
-
-      noActiveImpFields = all(.not.impFieldActive)
-
-      do i = 1,numImpFields
-        mbgFieldName(i) = 'mbg_'//trim(impFieldName(i))
-        mbgFieldStdName(i) = 'mbg_'//trim(impFieldStdName(i))
-      enddo
-!
-! -------------------------------------------------------------------- /
-! 4.  Initialize export field list
-!
-      istep_export: do istep = 1, 2
-      
-      if ( istep.eq.2 ) then
-        allocate ( expFieldName(numExpFields), &
-                   expFieldStdName(numExpFields), &
-                   expFieldDim(numExpFields), &
-                   expFieldActive(numExpFields), &
-                   expField(numExpFields), &
-                   stat=rc )
-        if (ESMF_LogFoundAllocError(rc, PASSTHRU)) return
-        expFieldActive(:) = .false.
-      endif
-      i = 0
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        expFieldName(i)    = 'charno'
-        expFieldStdName(i) = 'sea_surface_salinity'
-        expFieldDim(i)     = 2
-      endif
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        expFieldName(i)    = 'z0rlen'
-        expFieldStdName(i) = 'sea_surface_height_above_sea_level'
-        expFieldDim(i)     = 2
-      endif
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        expFieldName(i)    = 'uscurr'
-        expFieldStdName(i) = 'sea_surface_height_above_sea_level'
-        expFieldDim(i)     = 3
-      endif
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        expFieldName(i)    = 'vscurr'
-        expFieldStdName(i) = 'sea_surface_height_above_sea_level'
-        expFieldDim(i)     = 3
-      endif
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        expFieldName(i)    = 'wbcuru'
-        expFieldStdName(i) = 'sea_surface_height_above_sea_level'
-        expFieldDim(i)     = 2
-      endif
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        expFieldName(i)    = 'wbcurv'
-        expFieldStdName(i) = 'sea_surface_height_above_sea_level'
-        expFieldDim(i)     = 2
-      endif
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        expFieldName(i)    = 'wbcurp'
-        expFieldStdName(i) = 'sea_surface_height_above_sea_level'
-        expFieldDim(i)     = 2
-      endif
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        expFieldName(i)    = 'wavsuu'
-        expFieldStdName(i) = 'sea_surface_height_above_sea_level'
-        expFieldDim(i)     = 2
-      endif
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        expFieldName(i)    = 'wavsuv'
-        expFieldStdName(i) = 'sea_surface_height_above_sea_level'
-        expFieldDim(i)     = 2
-      endif
-
-      i = i + 1
-      if ( istep.eq.2 ) then
-        expFieldName(i)    = 'wavsvv'
-        expFieldStdName(i) = 'sea_surface_height_above_sea_level'
-        expFieldDim(i)     = 2
-      endif
-
-      numExpFields = i
-      enddo istep_export
-
-      noActiveExpFields = all(.not.expFieldActive)
-!
-! -------------------------------------------------------------------- /
-! 5.  Advertise import fields
-!
-! 5.a Advertise active import fields
-!
-!
-! 5.b Report advertised import fields
-!
-!
-! -------------------------------------------------------------------- /
-! 6.  Advertise export fields
-!
-! 6.a Advertise all export fields
-!
-!
-! 6.b Report advertised export fields
-!
 !
 ! -------------------------------------------------------------------- /
 ! Post
 !
-      rc = ESMF_SUCCESS
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': leaving InitializeP1', ESMF_LOGMSG_INFO)
+!      rc = ESMF_SUCCESS
+!ALT      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
+!ALT        ': leaving InitializeP1', ESMF_LOGMSG_INFO)
 !
 ! -------------------------------------------------------------------- /
 ! Formats
@@ -979,11 +702,11 @@
 !/
 !/ End of InitializeP1 ----------------------------------------------- /
 !/
-      end subroutine InitializeP1
+!ALT      end subroutine InitializeP1
 !/ ------------------------------------------------------------------- /
 #undef METHOD
 #define METHOD "InitializeP3"
-      subroutine InitializeP3 ( gcomp, impState, expState, extClock, rc )
+!ALT      subroutine InitializeP3 ( gc, impState, expState, extClock, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1008,7 +731,7 @@
 !
 !     Parameter list
 !     ----------------------------------------------------------------
-!       gcomp     Type   I/O Gridded component
+!       gc     Type   I/O Gridded component
 !       impState  Type   I/O Import state
 !       expState  Type   I/O Export state
 !       extClock  Type   I   External clock
@@ -1023,46 +746,23 @@
 !      WMINITNML       Subr. WMINITMD Wave model initialization
 !     ----------------------------------------------------------------
 !
-!  5. Called by :
-!
-!  6. Error messages :
-!
-!  7. Remarks :
-!
-!  8. Structure :
-!
-!  9. Switches :
-!
-! 10. Source code :
-!
-!/ ------------------------------------------------------------------- /
-!/
-!/ ------------------------------------------------------------------- /
-!/ Parameter list
-!/
-      type(ESMF_GridComp) :: gcomp
-      type(ESMF_State)    :: impState
-      type(ESMF_State)    :: expState
-      type(ESMF_Clock)    :: extClock
-      integer,intent(out) :: rc
-!/
-!/ ------------------------------------------------------------------- /
-!/ Local parameters
-!/
-      character(ESMF_MAXSTR) :: cname
-      integer :: i1, i2, i3, i, n
-      logical :: isConnected
+!ALT      character(ESMF_MAXSTR) :: cname
+!ALT      integer :: i1, i2, i3, i, n
+!ALT      logical :: isConnected
 !
 ! -------------------------------------------------------------------- /
 ! Prep
 !
-      rc = ESMF_SUCCESS
-      call ESMF_VMWtime(wstime)
-      call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': entered InitializeP3', ESMF_LOGMSG_INFO)
+!ALT      rc = ESMF_SUCCESS
+!ALT      call ESMF_VMWtime(wstime)
+!ALT      call ESMF_GridCompGet(gc, name=cname, rc=rc)
+!ALT      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+!ALT      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
+!ALT        ': entered InitializeP3', ESMF_LOGMSG_INFO)
+
+!ALT I thin we can safely skip 1,2 (pretty much to the end of P3)
 !
+#if 0
 ! -------------------------------------------------------------------- /
 ! 1.  Realize active import fields
 !
@@ -1072,15 +772,15 @@
          write(msg,'(a)') trim(cname)// &
            ': Creating import grid for Reg/Curvilinear Mode'
          call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-         call CreateImpGrid( gcomp, rc=rc )
+         call CreateImpGrid( gc, rc=rc )
          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-         call ESMF_GridCompSet(gcomp, grid=impGrid,rc=rc)
+         call ESMF_GridCompSet(gc, grid=impGrid,rc=rc)
          if (ESMF_LogFoundError(rc, PASSTHRU)) return
       elseif (GTYPE.eq.UNGTYPE) then
          write(msg,'(a)') trim(cname)// &
            ': Creating import mesh for Unstructured Mode'
          call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-         call CreateImpMesh( gcomp, rc=rc )
+         call CreateImpMesh( gc, rc=rc )
          if (ESMF_LogFoundError(rc, PASSTHRU)) return
       endif
 !
@@ -1172,13 +872,13 @@
       if ( (GTYPE.eq.RLGTYPE).or.(GTYPE.eq.CLGTYPE) ) then
          write(msg,'(a)') trim(cname)// &
            ': Creating export grid for Reg/Curvilinear Mode'
-         call CreateExpGrid( gcomp, rc=rc )
+         call CreateExpGrid( gc, rc=rc )
          if (ESMF_LogFoundError(rc, PASSTHRU)) return
       elseif (GTYPE.eq.UNGTYPE) then
          write(msg,'(a)') trim(cname)// &
            ': Creating export mesh for Unstructured Mode'
          call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-         call CreateExpMesh( gcomp, rc=rc )
+         call CreateExpMesh( gc, rc=rc )
          if (ESMF_LogFoundError(rc, PASSTHRU)) return
       endif
 !
@@ -1281,17 +981,20 @@
 ! -------------------------------------------------------------------- /
 ! Post
 !
-      rc = ESMF_SUCCESS
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': leaving InitializeP3', ESMF_LOGMSG_INFO)
+!ALT      rc = ESMF_SUCCESS
+!ALT      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
+!ALT        ': leaving InitializeP3', ESMF_LOGMSG_INFO)
 !/
 !/ End of InitializeP3 ----------------------------------------------- /
 !/
-      end subroutine InitializeP3
+#endif !if 0
+!ALT      end subroutine InitializeP3
+      _RETURN(ESMF_SUCCESS)
+    end subroutine Initialize
 !/ ------------------------------------------------------------------- /
 #undef METHOD
 #define METHOD "Finalize"
-      subroutine Finalize ( gcomp, impState, expState, extClock, rc )
+      subroutine Finalize ( gc, impState, expState, extClock, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1313,7 +1016,7 @@
 !
 !     Parameter list
 !     ----------------------------------------------------------------
-!       gcomp     Type   I/O Gridded component
+!       gc     Type   I/O Gridded component
 !       impState  Type   I/O Import state
 !       expState  Type   I/O Export state
 !       extClock  Type   I   External clock
@@ -1344,7 +1047,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      type(ESMF_GridComp) :: gcomp
+      type(ESMF_GridComp) :: gc
       type(ESMF_State)    :: impState
       type(ESMF_State)    :: expState
       type(ESMF_Clock)    :: extClock
@@ -1362,11 +1065,8 @@
 ! Prep
 !
       rc = ESMF_SUCCESS
-      call ESMF_VMWtime(wstime)
-      call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': entered Finalize', ESMF_LOGMSG_INFO)
+!ALT      call ESMF_VMWtime(wstime)
+      call ESMF_GridCompGet(gc, name=cname, __RC__)
 !
 ! -------------------------------------------------------------------- /
 ! 1.  Finalize the wave model
@@ -1376,125 +1076,28 @@
 ! -------------------------------------------------------------------- /
 ! 2.  Clean up ESMF data structures
 !
-! 2.a Import field and grid stuff
-!
-      if ( .not.noActiveImpFields ) then
-
-        do i = 1,numImpFields
-          if (.not.impFieldActive(i)) cycle
-          call ESMF_FieldDestroy(impField(i), rc=rc)
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-          if (.not.mbgFieldActive(i)) cycle
-          call ESMF_FieldDestroy(mbgField(i), rc=rc)
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-          call ESMF_FieldDestroy(bmskField(i), rc=rc)
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        enddo
-
-        if ( (GTYPE.eq.RLGTYPE).or.(GTYPE.eq.CLGTYPE) ) then
-          call ESMF_FieldHaloRelease(impHaloRH, rc=rc)
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-
-          call ESMF_GridDestroy(impGrid, rc=rc)
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-
-        elseif (GTYPE.eq.UNGTYPE) then
-!AW          call ESMF_GridDestroy(impMesh, rc=rc)
-!AW          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        endif
-
-      endif
-
-      deallocate (impFieldName, &
-                  impFieldStdName, &
-                  impFieldInitRqrd, &
-                  impFieldActive, &
-                  impField, &
-                  stat=rc)
-      if (ESMF_LogFoundDeallocError(rc, PASSTHRU)) return
-
-      deallocate (mbgFieldName, &
-                  mbgFieldStdName, &
-                  mbgFieldActive, &
-                  mbgField, &
-                  bmskField, &
-                  stat=rc)
-      if (ESMF_LogFoundDeallocError(rc, PASSTHRU)) return
-!
-! 2.b Export field and grid stuff
-!
-      if ( .not.noActiveExpFields ) then
-
-        do i = 1,numExpFields
-          if (.not.expFieldActive(i)) cycle
-          call ESMF_FieldDestroy(expField(i), rc=rc)
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        enddo
-
-        if ( (GTYPE.eq.RLGTYPE).or.(GTYPE.eq.CLGTYPE) ) then
-          call ESMF_FieldHaloRelease(expHaloRH, rc=rc)
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-
-          call ESMF_GridDestroy(expGrid, rc=rc)
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-
-        elseif (GTYPE.eq.UNGTYPE) then
-!AW          call ESMF_GridDestroy(expMesh, rc=rc)
-!AW          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        endif
-
-      endif
-
-      deallocate (expFieldName, &
-                  expFieldStdName, &
-                  expFieldDim, &
-                  expFieldActive, &
-                  expField, &
-                  stat=rc)
-      if (ESMF_LogFoundDeallocError(rc, PASSTHRU)) return
-!
-! 2.c Native field and grid stuff
-!
-      if ( .not.noActiveExpFields ) then
-
-        call ESMF_FieldRedistRelease(n2eRH, rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-
-        call ESMF_GridDestroy(natGrid, rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-
-      endif
 !
 ! -------------------------------------------------------------------- /
 ! 3.  Clean up locally allocated data structures
 !
       if (allocated(zl)) then
-        deallocate (zl, stat=rc)
-        if (ESMF_LogFoundDeallocError(rc, PASSTHRU)) return
+        deallocate (zl, __STAT__)
       endif
 !
 ! -------------------------------------------------------------------- /
 ! Post
 !
       rc = ESMF_SUCCESS
-      if ( improc .eq. nmpscr ) write (*,999)
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': leaving Finalize', ESMF_LOGMSG_INFO)
-!
-! -------------------------------------------------------------------- /
-! Formats
-!
-  999 format(//'  End of program '/                                   &
-               ' ========================================'/           &
-               '          WAVEWATCH III Multi-grid shell '/)
+      _RETURN(ESMF_SUCCESS)
 !/
 !/ End of Finalize --------------------------------------------------- /
 !/
       end subroutine Finalize
 !/ ------------------------------------------------------------------- /
+#if 0
 #undef METHOD
 #define METHOD "DataInitialize"
-      subroutine DataInitialize ( gcomp, rc )
+      subroutine DataInitialize ( gc, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1515,7 +1118,7 @@
 !
 !     Parameter list
 !     ----------------------------------------------------------------
-!       gcomp     Type   I/O Gridded component
+!       gc     Type   I/O Gridded component
 !       rc        Int.   O   Return code
 !     ----------------------------------------------------------------
 !
@@ -1544,7 +1147,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      type(ESMF_GridComp) :: gcomp
+      type(ESMF_GridComp) :: gc
       integer,intent(out) :: rc
 !/
 !/ ------------------------------------------------------------------- /
@@ -1561,8 +1164,8 @@
 ! Prep
 !
       rc = ESMF_SUCCESS
-      call ESMF_VMWtime(wstime)
-      call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
+!ALT      call ESMF_VMWtime(wstime)
+      call ESMF_GridCompGet(gc, name=cname, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': entered DataInitialize', ESMF_LOGMSG_INFO)
@@ -1570,7 +1173,7 @@
 ! -------------------------------------------------------------------- /
 ! 1.  Check that required import fields show correct time stamp
 !
-      call ESMF_GridCompGet(gcomp, clock=clock, rc=rc)
+      call ESMF_GridCompGet(gc, clock=clock, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       call ESMF_ClockGet(clock, currTime=currTime, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
@@ -1647,7 +1250,7 @@
 !
 ! 2.c Get import fields
 !
-      call GetImport(gcomp, rc)
+      call GetImport(gc, rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
 !
 ! 2.d Finish initialization (compute initial state), if not restart
@@ -1665,7 +1268,7 @@
 !
 ! 2.e Set export fields
 !
-      call SetExport(gcomp, rc)
+      call SetExport(gc, rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
 !
 ! 2.f Set Updated Field Attribute to "true", indicating to the
@@ -1681,7 +1284,7 @@
 ! 2.g Set InitializeDataComplete Attribute to "true", indicating to the
 !     generic code that all inter-model data dependencies are satisfied
 !
-      call NUOPC_CompAttributeSet(gcomp, name="InitializeDataComplete", &
+      call NUOPC_CompAttributeSet(gc, name="InitializeDataComplete", &
         value="true", rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
 !
@@ -1696,9 +1299,10 @@
 !/
       end subroutine DataInitialize
 !/ ------------------------------------------------------------------- /
+#endif
 #undef METHOD
 #define METHOD "ModelAdvance"
-      subroutine ModelAdvance ( gcomp, rc )
+      subroutine ModelAdvance ( gc, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1719,7 +1323,7 @@
 !
 !     Parameter list
 !     ----------------------------------------------------------------
-!       gcomp     Type   I/O Gridded component
+!       gc     Type   I/O Gridded component
 !       rc        Int.   O   Return code
 !     ----------------------------------------------------------------
 !
@@ -1749,7 +1353,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      type(ESMF_GridComp) :: gcomp
+      type(ESMF_GridComp) :: gc
       integer,intent(out) :: rc
 !/
 !/ ------------------------------------------------------------------- /
@@ -1769,8 +1373,8 @@
 ! Prep
 !
       rc = ESMF_SUCCESS
-      call ESMF_VMWtime(wstime)
-      call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
+!ALT      call ESMF_VMWtime(wstime)
+      call ESMF_GridCompGet(gc, name=cname, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': entered ModelAdvance', ESMF_LOGMSG_INFO)
@@ -1783,7 +1387,7 @@
 !
 ! 1.a Get component clock
 !
-      call ESMF_GridCompGet(gcomp, clock=clock, rc=rc)
+      call ESMF_GridCompGet(gc, clock=clock, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
 !
 ! 1.b Report
@@ -1836,7 +1440,7 @@
 !
 ! 1.e Get import fields
 !
-      call GetImport(gcomp, rc=rc)
+      call GetImport(gc, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
 !
 ! 1.f Advance model
@@ -1845,7 +1449,7 @@
 !
 ! 1.g Set export fields
 !
-      call SetExport(gcomp, rc=rc)
+      call SetExport(gc, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
 !
 ! -------------------------------------------------------------------- /
@@ -1861,9 +1465,10 @@
 !/
       end subroutine ModelAdvance
 !/ ------------------------------------------------------------------- /
+
 #undef METHOD
 #define METHOD "GetImport"
-      subroutine GetImport ( gcomp, rc )
+      subroutine GetImport ( gc, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1884,7 +1489,7 @@
 !
 !     Parameter list
 !     ----------------------------------------------------------------
-!       gcomp     Type   I/O Gridded component
+!       gc     Type   I/O Gridded component
 !       rc        Int.   O   Return code
 !     ----------------------------------------------------------------
 !
@@ -1912,7 +1517,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      type(ESMF_GridComp) :: gcomp
+      type(ESMF_GridComp) :: gc
       integer,intent(out) :: rc
 !/
 !/ ------------------------------------------------------------------- /
@@ -1940,13 +1545,13 @@
 !
       rc = ESMF_SUCCESS
       if ( noActiveImpFields ) return
-      call ESMF_VMWtime(wstime)
-      call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
+!ALT      call ESMF_VMWtime(wstime)
+      call ESMF_GridCompGet(gc, name=cname, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': entered GetImport', ESMF_LOGMSG_INFO)
 #if defined(TEST_WMESMFMD) || defined(TEST_WMESMFMD_GETIMPORT)
-      call NUOPC_ModelGet(gcomp, importState=dumpState, rc=rc)
+      call NUOPC_ModelGet(gc, importState=dumpState, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       call NUOPC_Write(dumpState, overwrite=.true., &
         fileNamePrefix="field_"//trim(cname)//"_import1_", &
@@ -1957,7 +1562,7 @@
 ! -------------------------------------------------------------------- /
 ! Set time stamps using currTime and stopTime
 !
-      call ESMF_GridCompGet(gcomp, clock=clock, rc=rc)
+      call ESMF_GridCompGet(gc, clock=clock, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       call ESMF_ClockGet(clock, currTime=currTime, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
@@ -2166,7 +1771,7 @@
 !/ ------------------------------------------------------------------- /
 #undef METHOD
 #define METHOD "SetExport"
-      subroutine SetExport ( gcomp, rc )
+      subroutine SetExport ( gc, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -2188,7 +1793,7 @@
 !
 !     Parameter list
 !     ----------------------------------------------------------------
-!       gcomp     Type   I/O Gridded component
+!       gc     Type   I/O Gridded component
 !       rc        Int.   O   Return code
 !     ----------------------------------------------------------------
 !
@@ -2216,7 +1821,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      type(ESMF_GridComp) :: gcomp
+      type(ESMF_GridComp) :: gc
       integer,intent(out) :: rc
 !/
 !/ ------------------------------------------------------------------- /
@@ -2225,6 +1830,7 @@
       character(ESMF_MAXSTR) :: cname
       integer :: i1, i2, i3
       logical :: flpart = .false., floutg = .false., floutg2 = .true.
+      integer :: status
 #if defined(TEST_WMESMFMD) || defined(TEST_WMESMFMD_SETEXPORT)
       type(ESMF_State) :: dumpState
       integer, save :: timeSlice = 1
@@ -2235,9 +1841,8 @@
 !
       rc = ESMF_SUCCESS
       if ( noActiveExpFields ) return
-      call ESMF_VMWtime(wstime)
-      call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+!ALT      call ESMF_VMWtime(wstime)
+      call ESMF_GridCompGet(gc, name=cname, __RC__)
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': entered SetExport', ESMF_LOGMSG_INFO)
 !
@@ -2323,7 +1928,7 @@
 ! Post
 !
 #if defined(TEST_WMESMFMD) || defined(TEST_WMESMFMD_SETEXPORT)
-      call NUOPC_ModelGet(gcomp, exportState=dumpState, rc=rc)
+      call NUOPC_ModelGet(gc, exportState=dumpState, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       call NUOPC_Write(dumpState, overwrite=.true., &
         fileNamePrefix="field_"//trim(cname)//"_export_", &
@@ -2341,7 +1946,7 @@
 !/ ------------------------------------------------------------------- /
 #undef METHOD
 #define METHOD "CreateImpGrid"
-      subroutine CreateImpGrid ( gcomp, rc )
+      subroutine CreateImpGrid ( gc, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -2362,7 +1967,7 @@
 !
 !     Parameter list
 !     ----------------------------------------------------------------
-!       gcomp     Type   I/O Gridded component
+!       gc     Type   I/O Gridded component
 !       rc        Int.   O   Return code
 !     ----------------------------------------------------------------
 !
@@ -2390,7 +1995,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      type(ESMF_GridComp) :: gcomp
+      type(ESMF_GridComp) :: gc
       integer,intent(out) :: rc
 !/
 !/ ------------------------------------------------------------------- /
@@ -2413,7 +2018,7 @@
 !
       rc = ESMF_SUCCESS
       if ( noActiveImpFields ) return
-      call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
+      call ESMF_GridCompGet(gc, name=cname, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': entered CreateImpGrid', ESMF_LOGMSG_INFO)
@@ -2705,7 +2310,7 @@
 !/ ------------------------------------------------------------------- /
 #undef METHOD
 #define METHOD "CreateExpGrid"
-      subroutine CreateExpGrid ( gcomp, rc )
+      subroutine CreateExpGrid ( gc, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -2726,7 +2331,7 @@
 !
 !     Parameter list
 !     ----------------------------------------------------------------
-!       gcomp     Type   I/O Gridded component
+!       gc     Type   I/O Gridded component
 !       rc        Int.   O   Return code
 !     ----------------------------------------------------------------
 !
@@ -2757,7 +2362,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      type(ESMF_GridComp) :: gcomp
+      type(ESMF_GridComp) :: gc
       integer,intent(out) :: rc
 !/
 !/ ------------------------------------------------------------------- /
@@ -2783,7 +2388,7 @@
 !
       rc = ESMF_SUCCESS
       if ( noActiveExpFields ) return
-      call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
+      call ESMF_GridCompGet(gc, name=cname, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': entered CreateExpGrid', ESMF_LOGMSG_INFO)
@@ -3222,7 +2827,7 @@
 !/ ------------------------------------------------------------------- /
 #undef METHOD
 #define METHOD "CreateImpMesh"
-      subroutine CreateImpMesh ( gcomp, rc )
+      subroutine CreateImpMesh ( gc, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -3248,7 +2853,7 @@
 !
 !     Parameter list
 !     ----------------------------------------------------------------
-!       gcomp     Type   I/O Gridded component
+!       gc     Type   I/O Gridded component
 !       rc        Int.   O   Return code
 !     ----------------------------------------------------------------
 !
@@ -3279,7 +2884,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      type(ESMF_GridComp) :: gcomp
+      type(ESMF_GridComp) :: gc
       integer,intent(out) :: rc
 !/
 !/ ------------------------------------------------------------------- /
@@ -3308,7 +2913,7 @@
 !
       rc = ESMF_SUCCESS
       if ( noActiveImpFields ) return
-      call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
+      call ESMF_GridCompGet(gc, name=cname, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': entered CreateImpMesh', ESMF_LOGMSG_INFO)
@@ -3581,7 +3186,7 @@
 !/ ------------------------------------------------------------------- /
 #undef METHOD
 #define METHOD "CreateExpMesh"
-      subroutine CreateExpMesh ( gcomp, rc )
+      subroutine CreateExpMesh ( gc, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -3614,7 +3219,7 @@
 !
 !     Parameter list
 !     ----------------------------------------------------------------
-!       gcomp     Type   I/O Gridded component
+!       gc     Type   I/O Gridded component
 !       rc        Int.   O   Return code
 !     ----------------------------------------------------------------
 !
@@ -3648,7 +3253,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      type(ESMF_GridComp) :: gcomp
+      type(ESMF_GridComp) :: gc
       integer,intent(out) :: rc
 !/
 !/ ------------------------------------------------------------------- /
@@ -3681,7 +3286,7 @@
 !
       rc = ESMF_SUCCESS
       if ( noActiveExpFields ) return
-      call ESMF_GridCompGet(gcomp, name=cname, rc=rc)
+      call ESMF_GridCompGet(gc, name=cname, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': entered CreateExpMesh', ESMF_LOGMSG_INFO)
