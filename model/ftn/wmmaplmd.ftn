@@ -360,8 +360,7 @@
       VERIFY_(status)
 
 ! --- Model advance method
-!ALT, we should use Run, but for first cut ModelAdvance is fine      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_RUN, Run, rc=status)
-      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_RUN, ModelAdvance, rc=status)
+      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_RUN, Run, rc=status)
       VERIFY_(status)
 
 ! --- Model finalize method
@@ -1302,7 +1301,7 @@
 #endif
 #undef METHOD
 #define METHOD "ModelAdvance"
-      subroutine ModelAdvance ( gc, rc )
+      subroutine Run ( gc, import, export, clock, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1351,10 +1350,13 @@
 !/ ------------------------------------------------------------------- /
 !/
 !/ ------------------------------------------------------------------- /
-!/ Parameter list
-!/
-      type(ESMF_GridComp) :: gc
-      integer,intent(out) :: rc
+! !ARGUMENTS:
+
+        type(ESMF_GridComp), intent(inout) :: GC     ! Gridded component 
+        type(ESMF_State),    intent(inout) :: IMPORT ! Import state
+        type(ESMF_State),    intent(inout) :: EXPORT ! Export state
+        type(ESMF_Clock),    intent(inout) :: CLOCK  ! The clock
+        integer, optional,   intent(  out) :: RC     ! Error code
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -1363,33 +1365,27 @@
       integer :: stat, imod, tcur(2)
       integer, allocatable :: tend(:,:)
       integer(ESMF_KIND_I4) :: yy,mm,dd,h,m,s
-      type(ESMF_Clock) :: clock
+!ALT      type(ESMF_Clock) :: clock
       type(ESMF_Time) :: currTime, stopTime
       type(ESMF_TimeInterval) :: timestep
       real :: delt
       logical :: lerr
+      integer :: status
 !
 ! -------------------------------------------------------------------- /
 ! Prep
 !
-      rc = ESMF_SUCCESS
-!ALT      call ESMF_VMWtime(wstime)
-      call ESMF_GridCompGet(gc, name=cname, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': entered ModelAdvance', ESMF_LOGMSG_INFO)
+      call ESMF_GridCompGet(gc, name=cname, __RC__)
 
-      allocate (tend(2,nrgrd), stat=rc)
-      if (ESMF_LogFoundAllocError(rc, PASSTHRU)) return
+      allocate (tend(2,nrgrd), __STAT__)
 !
 ! -------------------------------------------------------------------- /
 ! 1.  Advance model to requested end time
 !
 ! 1.a Get component clock
 !
-      call ESMF_GridCompGet(gc, clock=clock, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-!
+#if 0
+      !
 ! 1.b Report
 !
       if ( improc .eq. nmpscr ) then
@@ -1398,14 +1394,13 @@
           preString="-->Advancing "//TRIM(cname)//" from: ")
         call ESMF_ClockPrint(clock, options="stopTime", &
           preString="-----------------> to: ")
-      endif
+     endif
+#endif     
 !
 ! 1.c Check internal current time with component current time
 !
-      call ESMF_ClockGet(clock, currTime=currTime, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      call ESMF_TimeGet(currTime, yy=yy,mm=mm,dd=dd,h=h,m=m,s=s, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+      call ESMF_ClockGet(clock, currTime=currTime, __RC__)
+      call ESMF_TimeGet(currTime, yy=yy,mm=mm,dd=dd,h=h,m=m,s=s, __RC__)
       lerr=.false.
       do imod = 1,nrgrd
         tcur(1) = 10000*yy + 100*mm + dd
@@ -1422,17 +1417,14 @@
         endif
       enddo
       if (lerr) then
-        rc = ESMF_FAILURE
-        return
+         _RETURN(ESMF_FAILURE)
       endif
 !
-! 1.d Set end time of this advance
+! 1.d Set end time of this advance (current+time_step)
 !
-      call ESMF_ClockGet(clock, timeStep=timestep, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+      call ESMF_ClockGet(clock, timeStep=timestep, __RC__)
       stopTime = currTime + timestep
-      call ESMF_TimeGet(stopTime, yy=yy,mm=mm,dd=dd,h=h,m=m,s=s, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+      call ESMF_TimeGet(stopTime, yy=yy,mm=mm,dd=dd,h=h,m=m,s=s, __RC__)
       do imod = 1,nrgrd
         tend(1,imod) = 10000*yy + 100*mm + dd
         tend(2,imod) = 10000*h  + 100*m  + s
@@ -1440,8 +1432,7 @@
 !
 ! 1.e Get import fields
 !
-      call GetImport(gc, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+      call GetImport(gc, import, __RC__)
 !
 ! 1.f Advance model
 !
@@ -1449,26 +1440,24 @@
 !
 ! 1.g Set export fields
 !
-      call SetExport(gc, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+!ALT not ready yet      call SetExport(gc, export, __RC__)
+      call SetExport(gc, __RC__)
 !
 ! -------------------------------------------------------------------- /
 ! Post
 !
-      deallocate (tend, stat=rc)
-      if (ESMF_LogFoundDeallocError(rc, PASSTHRU)) return
-      rc = ESMF_SUCCESS
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': leaving ModelAdvance', ESMF_LOGMSG_INFO)
+      deallocate (tend, __STAT__)
+
+      _RETURN(ESMF_SUCCESS)
 !/
 !/ End of ModelAdvance ----------------------------------------------- /
 !/
-      end subroutine ModelAdvance
+    end subroutine Run
 !/ ------------------------------------------------------------------- /
 
 #undef METHOD
 #define METHOD "GetImport"
-      subroutine GetImport ( gc, rc )
+      subroutine GetImport ( gc, import, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1518,7 +1507,8 @@
 !/ Parameter list
 !/
       type(ESMF_GridComp) :: gc
-      integer,intent(out) :: rc
+      type(ESMF_State),    intent(inout) :: IMPORT ! Import state
+      integer, optional,   intent(out) :: rc
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -1539,18 +1529,19 @@
       type(ESMF_State) :: dumpState
       integer, save :: timeSlice = 1
 #endif
+      real, pointer :: uwind(:,:) => null()
+      real, pointer :: vwind(:,:) => null()
+      real, pointer :: fraci(:,:) => null()
+      integer :: status
 !
 ! -------------------------------------------------------------------- /
 ! Prep
 !
-      rc = ESMF_SUCCESS
-      if ( noActiveImpFields ) return
 !ALT      call ESMF_VMWtime(wstime)
-      call ESMF_GridCompGet(gc, name=cname, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+      call ESMF_GridCompGet(gc, name=cname, __RC__)
+#if defined(TEST_WMESMFMD) || defined(TEST_WMESMFMD_GETIMPORT)
       if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
         ': entered GetImport', ESMF_LOGMSG_INFO)
-#if defined(TEST_WMESMFMD) || defined(TEST_WMESMFMD_GETIMPORT)
       call NUOPC_ModelGet(gc, importState=dumpState, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       call NUOPC_Write(dumpState, overwrite=.true., &
@@ -1558,212 +1549,118 @@
         timeslice=timeSlice, relaxedFlag=.true., rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
 #endif
+
+      impGridID = minval(inpmap)
+      if ( impGridID.eq.-999 ) impGridID = 1
+
 !
 ! -------------------------------------------------------------------- /
 ! Set time stamps using currTime and stopTime
 !
-      call ESMF_GridCompGet(gc, clock=clock, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      call ESMF_ClockGet(clock, currTime=currTime, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      call ESMF_TimeGet(currTime, yy=yy,mm=mm,dd=dd,h=h,m=m,s=s, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+      call ESMF_GridCompGet(gc, clock=clock, __RC__)
+      call ESMF_ClockGet(clock, currTime=currTime, __RC__)
+      call ESMF_TimeGet(currTime, yy=yy,mm=mm,dd=dd,h=h,m=m,s=s, __RC__)
       tcur(1) = 10000*yy + 100*mm + dd
       tcur(2) = 10000*h  + 100*m  + s
-      call ESMF_ClockGet(clock, timeStep=timestep, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+      call ESMF_ClockGet(clock, timeStep=timestep, __RC__)
       stopTime = currTime + timestep
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      call ESMF_TimeGet(stopTime, yy=yy,mm=mm,dd=dd,h=h,m=m,s=s, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+      call ESMF_TimeGet(stopTime, yy=yy,mm=mm,dd=dd,h=h,m=m,s=s, __RC__)
       tend(1) = 10000*yy + 100*mm + dd
       tend(2) = 10000*h  + 100*m  + s
 !
 ! -------------------------------------------------------------------- /
 ! Water levels
 !
-      j = 1
-      i1 = FieldIndex( impFieldName, 'seahgt', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      i2 = i1
-      if ( impFieldActive(i1) ) then
-        call w3setg ( impGridID, mdse, mdst )
-        call w3seti ( impGridID, mdse, mdst )
-        if (firstCall) then
-          tln = tcur
-        else
-          tln = tend
-        endif
-        tfn(:,j) = tln
-        if ( mbgFieldActive(i1) ) then
-          call BlendImpField( impField(i1), mbgField(i1), bmskField(i1), rc=rc )
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        endif
-        call FieldGather( impField(i1), nx, ny, wlev, rc=rc )
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        do imod = 1,nrgrd
-          call w3setg ( imod, mdse, mdst )
-          call w3setw ( imod, mdse, mdst )
-          call w3seti ( imod, mdse, mdst )
-          call w3seto ( imod, mdse, mdst )
-          call wmsetm ( imod, mdse, mdst )
-!/MPI          if ( mpi_comm_grd .eq. mpi_comm_null ) cycle
-          jmod = inpmap(imod,j)
-          if ( jmod.lt.0 .and. jmod.ne.-999 ) then
-            call wmupd2( imod, j, jmod, rc )
-            if (ESMF_LogFoundError(rc, PASSTHRU)) return
-          endif
-        enddo
-      endif
+      !ALT not done yet
+      ! j = 1
+      ! var: wlev
 !
 ! -------------------------------------------------------------------- /
 ! Currents
 !
-      j = 2
-      i1 = FieldIndex( impFieldName, 'uucurr', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      i2 = FieldIndex( impFieldName, 'vvcurr', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      if ( impFieldActive(i1) ) then
-        call w3setg ( impGridID, mdse, mdst )
-        call w3seti ( impGridID, mdse, mdst )
-        if (firstCall) then
-          tcn = tcur
-        else
-          tc0 = tcn
-          cx0 = cxn
-          cy0 = cyn
-          tcn = tend
-        endif
-        tfn(:,j) = tcn
-        if ( mbgFieldActive(i1) ) then
-          call BlendImpField( impField(i1), mbgField(i1), bmskField(i1), rc=rc )
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-          call BlendImpField( impField(i2), mbgField(i2), bmskField(i2), rc=rc )
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        endif
-        call FieldGather( impField(i1), nx, ny, cxn, rc=rc )
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        call FieldGather( impField(i2), nx, ny, cyn, rc=rc )
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        if (firstCall) then
-          tc0 = tcn
-          cx0 = cxn
-          cy0 = cyn
-        endif
-        do imod = 1,nrgrd
-          call w3setg ( imod, mdse, mdst )
-          call w3setw ( imod, mdse, mdst )
-          call w3seti ( imod, mdse, mdst )
-          call wmsetm ( imod, mdse, mdst )
-!/MPI          if ( mpi_comm_grd .eq. mpi_comm_null ) cycle
-          jmod = inpmap(imod,j)
-          if ( jmod.lt.0 .and. jmod.ne.-999 ) then
-            call wmupd2( imod, j, jmod, rc )
-            if (ESMF_LogFoundError(rc, PASSTHRU)) return
-          endif
-        enddo
-      endif
+      !ALT not done yet
+      ! j = 2
+      ! vars: cxn, cyn
+      ! deal also with: cx0, cy0
 !
 ! -------------------------------------------------------------------- /
 ! Winds
 !
       j = 3
-      i1 = FieldIndex( impFieldName, 'uutrue', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      i2 = FieldIndex( impFieldName, 'vvtrue', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      if ( impFieldActive(i1) ) then
-        call w3setg ( impGridID, mdse, mdst )
-        call w3seti ( impGridID, mdse, mdst )
-        if (firstCall) then
-          twn = tcur
-        else
-          tw0 = twn
-          wx0 = wxn
-          wy0 = wyn
-          twn = tend
-        endif
-        tfn(:,j) = twn
-        if ( mbgFieldActive(i1) ) then
-          call BlendImpField( impField(i1), mbgField(i1), bmskField(i1), rc=rc )
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-          call BlendImpField( impField(i2), mbgField(i2), bmskField(i2), rc=rc )
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        endif
-        call FieldGather( impField(i1), nx, ny, wxn, rc=rc )
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        call FieldGather( impField(i2), nx, ny, wyn, rc=rc )
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        if (firstCall) then
-          tw0 = twn
-          wx0 = wxn
-          wy0 = wyn
-        endif
-        do imod = 1,nrgrd
-          call w3setg ( imod, mdse, mdst )
-          call w3setw ( imod, mdse, mdst )
-          call w3seti ( imod, mdse, mdst )
-          call wmsetm ( imod, mdse, mdst )
-!/MPI          if ( mpi_comm_grd .eq. mpi_comm_null ) cycle
-          jmod = inpmap(imod,j)
-          if ( jmod.lt.0 .and. jmod.ne.-999 ) then
-            call wmupd2( imod, j, jmod, rc )
-            if (ESMF_LogFoundError(rc, PASSTHRU)) return
-          endif
-        enddo
+      ! get pointer(s) to import
+      call MAPL_GetPointer(import, uwind, 'U10M', __RC__)
+      call MAPL_GetPointer(import, vwind, 'V10M', __RC__)
+      wx0 = uwind
+      wy0 = vwind
+      wxn = uwind
+      wyn = vwind
+      
+      call w3setg ( impGridID, mdse, mdst )
+      call w3seti ( impGridID, mdse, mdst )
+      if (firstCall) then
+         twn = tcur
+      else
+         tw0 = twn
+         wx0 = wxn
+         wy0 = wyn
+         twn = tend
       endif
+      tfn(:,j) = twn
+      if (firstCall) then
+         tw0 = twn
+         wx0 = wxn
+         wy0 = wyn
+      endif
+      do imod = 1,nrgrd
+         call w3setg ( imod, mdse, mdst )
+         call w3setw ( imod, mdse, mdst )
+         call w3seti ( imod, mdse, mdst )
+         call wmsetm ( imod, mdse, mdst )
+!/MPI          if ( mpi_comm_grd .eq. mpi_comm_null ) cycle
+
+
+         jmod = inpmap(imod,j)
+         if ( jmod.lt.0 .and. jmod.ne.-999 ) then
+            call wmupd2( imod, j, jmod, status )
+            _VERIFY(status)
+         endif
+      enddo
+
 !
 ! -------------------------------------------------------------------- /
 ! Sea ice concentration
 !
       j = 4
-      i1 = FieldIndex( impFieldName, 'seaice', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      i2 = i1
-      if ( impFieldActive(i1) ) then
-        call w3setg ( impGridID, mdse, mdst )
-        call w3seti ( impGridID, mdse, mdst )
-        if (firstCall) then
-          tin = tcur
-        else
-          tin = tend
-        endif
-        tfn(:,j) = tin
-        if ( mbgFieldActive(i1) ) then
-          call BlendImpField( impField(i1), mbgField(i1), bmskField(i1), rc=rc )
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        endif
-        call FieldGather( impField(i1), nx, ny, icei, rc=rc )
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        do imod = 1,nrgrd
-          call w3setg ( imod, mdse, mdst )
-          call w3setw ( imod, mdse, mdst )
-          call w3seti ( imod, mdse, mdst )
-          call wmsetm ( imod, mdse, mdst )
-!/MPI          if ( mpi_comm_grd .eq. mpi_comm_null ) cycle
-          jmod = inpmap(imod,j)
-          if ( jmod.lt.0 .and. jmod.ne.-999 ) then
-            call wmupd2( imod, j, jmod, rc )
-            if (ESMF_LogFoundError(rc, PASSTHRU)) return
-          endif
-        enddo
+      call MAPL_GetPointer(import, fraci, 'FRACI', __RC__)
+      icei = fraci
+
+      call w3setg ( impGridID, mdse, mdst )
+      call w3seti ( impGridID, mdse, mdst )
+      if (firstCall) then
+         tin = tcur
+      else
+         tin = tend
       endif
+      tfn(:,j) = tin
+
+!ALT      call FieldGather( impField(i1), nx, ny, icei, rc=rc )
+      do imod = 1,nrgrd
+         call w3setg ( imod, mdse, mdst )
+         call w3setw ( imod, mdse, mdst )
+         call w3seti ( imod, mdse, mdst )
+         call wmsetm ( imod, mdse, mdst )
+!/MPI          if ( mpi_comm_grd .eq. mpi_comm_null ) cycle
+         jmod = inpmap(imod,j)
+         if ( jmod.lt.0 .and. jmod.ne.-999 ) then
+            call wmupd2( imod, j, jmod, status )
+            _VERIFY(status)
+         endif
+      enddo
 !
 ! -------------------------------------------------------------------- /
 ! Post
 !
-#if defined(TEST_WMESMFMD) || defined(TEST_WMESMFMD_GETIMPORT)
-      call NUOPC_Write(dumpState, overwrite=.true., &
-        fileNamePrefix="field_"//trim(cname)//"_import2_", &
-        timeslice=timeSlice, relaxedFlag=.true., rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      timeSlice = timeSlice + 1
-#endif
-      firstCall = .false.
-      rc = ESMF_SUCCESS
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': leaving GetImport', ESMF_LOGMSG_INFO)
+      _RETURN(ESMF_SUCCESS)
 !/
 !/ End of GetImport -------------------------------------------------- /
 !/
