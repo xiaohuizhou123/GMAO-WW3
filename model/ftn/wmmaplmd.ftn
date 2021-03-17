@@ -639,6 +639,14 @@
 !
 ! 2.a Call into WMINIT
 !     
+      call ESMF_GridCompGet(gc, configIsPresent=configIsPresent, __RC__)
+      if (configIsPresent) then
+         call ESMF_GridCompGet(gc, config=config, __RC__)
+         call ESMF_ConfigGetAttribute(config, ifname, &
+              label=trim(cname)//'_input_file_name:', &
+              default='ww3_multi.inp', __RC__)
+      end if
+
       if ( .not.lsep_ss ) idss = stdo
       if ( .not.lsep_st ) idst = stdo
       if ( .not.lsep_se ) idse = stdo
@@ -646,7 +654,7 @@
         call wminitnml ( idsi, idso, idss, idst, idse, trim(ifname), &
                          mpicomm, preamb=preamb )
       else
-        call wminit ( idsi, idso, idss, idst, idse, trim(ifname), &
+       call wminit ( idsi, idso, idss, idst, idse, trim(ifname), &
                       mpicomm, preamb=preamb )
       endif
 !
@@ -761,6 +769,12 @@
 
 !ALT I thin we can safely skip 1,2 (pretty much to the end of P3)
 !
+! Call GenericInitialize
+! ----------------------
+      call MAPL_GenericInitialize(GC, impState, expState, extCLOCK, __RC__)
+
+      call DataInitialize(gc, impState, extClock, __RC__)
+
 #if 0
 ! -------------------------------------------------------------------- /
 ! 1.  Realize active import fields
@@ -1093,10 +1107,9 @@
 !/
       end subroutine Finalize
 !/ ------------------------------------------------------------------- /
-#if 0
 #undef METHOD
 #define METHOD "DataInitialize"
-      subroutine DataInitialize ( gc, rc )
+      subroutine DataInitialize ( gc, import, clock, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1147,86 +1160,31 @@
 !/ Parameter list
 !/
       type(ESMF_GridComp) :: gc
+      type(ESMF_State)    :: import
+      type(ESMF_State)    :: export
+      type(ESMF_Clock)    :: clock
       integer,intent(out) :: rc
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
       character(ESMF_MAXSTR) :: cname
-      type(ESMF_Clock) :: clock
       type(ESMF_Time) :: currTime
       logical :: fldUpdated, allUpdated
       integer :: i, imod
+      integer :: status
       logical :: local
 !
 ! -------------------------------------------------------------------- /
 ! Prep
 !
-      rc = ESMF_SUCCESS
-!ALT      call ESMF_VMWtime(wstime)
-      call ESMF_GridCompGet(gc, name=cname, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': entered DataInitialize', ESMF_LOGMSG_INFO)
+      call ESMF_GridCompGet(gc, name=cname, __RC__)
 !
 ! -------------------------------------------------------------------- /
 ! 1.  Check that required import fields show correct time stamp
 !
-      call ESMF_GridCompGet(gc, clock=clock, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      call ESMF_ClockGet(clock, currTime=currTime, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+      call ESMF_ClockGet(clock, currTime=currTime, __RC__)
 
-      allUpdated = .true.
-      do i = 1,numImpFields
-        if (.not.impFieldActive(i)) cycle
-        if (impFieldInitRqrd(i)) then
-          fldUpdated = NUOPC_IsAtTime(impField(i), currTime, rc=rc)
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-          if (fldUpdated) then
-            write(msg,'(a,a10,a,a13)') trim(cname)//': ', &
-              trim(impFieldName(i)),': inter-model data dependency: ', &
-              'SATISFIED'
-          else
-            allUpdated = .false.
-            write(msg,'(a,a10,a,a13)') trim(cname)//': ', &
-              trim(impFieldName(i)),': inter-model data dependency: ', &
-              'NOT SATISFIED'
-          endif
-        else
-          write(msg,'(a,a10,a,a13)') trim(cname)//': ', &
-            trim(impFieldName(i)),': inter-model data dependency: ', &
-            'NOT  REQUIRED'
-        endif
-        if (verbosity.gt.0) call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-        if (improc.eq.nmpscr) write(*,'(a)') trim(msg)
-        ! background
-        if (.not.mbgFieldActive(i)) cycle
-        if (impFieldInitRqrd(i)) then
-          fldUpdated = NUOPC_IsAtTime(mbgField(i), currTime, rc=rc)
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-          if (fldUpdated) then
-            write(msg,'(a,a10,a,a13)') trim(cname)//': ', &
-              trim(mbgFieldName(i)),': inter-model data dependency: ', &
-              'SATISFIED'
-          else
-            allUpdated = .false.
-            write(msg,'(a,a10,a,a13)') trim(cname)//': ', &
-              trim(mbgFieldName(i)),': inter-model data dependency: ', &
-              'NOT SATISFIED'
-          endif
-        else
-          write(msg,'(a,a10,a,a13)') trim(cname)//': ', &
-            trim(mbgFieldName(i)),': inter-model data dependency: ', &
-            'NOT  REQUIRED'
-        endif
-        if (verbosity.gt.0) call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-        if (improc.eq.nmpscr) write(*,'(a)') trim(msg)
-      enddo
-!
-! If not all import dependencies are satisfied, then return
-!
-      if (.not.allUpdated) goto 1
 !
 ! -------------------------------------------------------------------- /
 ! 2.  All import dependencies are satisfied, so finish initialization
@@ -1235,22 +1193,13 @@
 !
       write(msg,'(a)') trim(cname)// &
         ': all inter-model data dependencies SATISFIED'
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+!      if (verbosity.gt.0) call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
       if (improc.eq.nmpscr) write(*,'(a)') trim(msg)
 !
-! 2.b Setup background blending mask for each import field
-!
-      do i = 1,numImpFields
-        if (.not.impFieldActive(i)) cycle
-        if (.not.mbgFieldActive(i)) cycle
-        call SetupImpBmsk(bmskField(i), impField(i), missingValue, rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      enddo
 !
 ! 2.c Get import fields
 !
-      call GetImport(gc, rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
+      call GetImport(gc, import, clock, __RC__)
 !
 ! 2.d Finish initialization (compute initial state), if not restart
 !
@@ -1273,31 +1222,17 @@
 ! 2.f Set Updated Field Attribute to "true", indicating to the
 !     generic code to set the timestamp for these fields
 !
-      do i = 1,numExpFields
-        if (.not.expFieldActive(i)) cycle
-        call NUOPC_SetAttribute(expField(i), name="Updated", &
-          value="true", rc=rc)
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      enddo
-!
-! 2.g Set InitializeDataComplete Attribute to "true", indicating to the
-!     generic code that all inter-model data dependencies are satisfied
-!
-      call NUOPC_CompAttributeSet(gc, name="InitializeDataComplete", &
-        value="true", rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
 !
 ! -------------------------------------------------------------------- /
 ! Post
 !
-1     rc = ESMF_SUCCESS
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': leaving DataInitialize', ESMF_LOGMSG_INFO)
+      _RETURN(ESMF_SUCCESS)
 !/
 !/ End of DataInitialize --------------------------------------------- /
 !/
       end subroutine DataInitialize
 !/ ------------------------------------------------------------------- /
+#if 0
 #endif
 #undef METHOD
 #define METHOD "ModelAdvance"
@@ -1413,7 +1348,7 @@
             'Wave model grid ',imod,': ', &
             'Internal time (',time(1),'.',time(2),') /= ', &
             'Component time (',tcur(1),'.',tcur(2),')'
-          call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_ERROR)
+          print *, 'WAVE ERROR:',trim(msg)
         endif
       enddo
       if (lerr) then
@@ -1432,7 +1367,7 @@
 !
 ! 1.e Get import fields
 !
-      call GetImport(gc, import, __RC__)
+      call GetImport(gc, import, clock, __RC__)
 !
 ! 1.f Advance model
 !
@@ -1457,7 +1392,7 @@
 
 #undef METHOD
 #define METHOD "GetImport"
-      subroutine GetImport ( gc, import, rc )
+      subroutine GetImport ( gc, import, clock, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1508,6 +1443,7 @@
 !/
       type(ESMF_GridComp) :: gc
       type(ESMF_State),    intent(inout) :: IMPORT ! Import state
+      type(ESMF_Clock),    intent(inout) :: CLOCK  ! The clock
       integer, optional,   intent(out) :: rc
 !/
 !/ ------------------------------------------------------------------- /
@@ -1522,9 +1458,9 @@
       logical, save :: firstCall = .true.
       integer :: tcur(2), tend(2)
       integer(ESMF_KIND_I4) :: yy,mm,dd,h,m,s
-      type(ESMF_Clock) :: clock
       type(ESMF_Time) :: currTime, stopTime
       type(ESMF_TimeInterval) :: timestep
+      type(ESMF_Field) :: field
 #if defined(TEST_WMESMFMD) || defined(TEST_WMESMFMD_GETIMPORT)
       type(ESMF_State) :: dumpState
       integer, save :: timeSlice = 1
@@ -1557,7 +1493,6 @@
 ! -------------------------------------------------------------------- /
 ! Set time stamps using currTime and stopTime
 !
-      call ESMF_GridCompGet(gc, clock=clock, __RC__)
       call ESMF_ClockGet(clock, currTime=currTime, __RC__)
       call ESMF_TimeGet(currTime, yy=yy,mm=mm,dd=dd,h=h,m=m,s=s, __RC__)
       tcur(1) = 10000*yy + 100*mm + dd
@@ -1590,13 +1525,10 @@
       ! get pointer(s) to import
       call MAPL_GetPointer(import, uwind, 'U10M', __RC__)
       call MAPL_GetPointer(import, vwind, 'V10M', __RC__)
-      wx0 = uwind
-      wy0 = vwind
-      wxn = uwind
-      wyn = vwind
-      
+
       call w3setg ( impGridID, mdse, mdst )
       call w3seti ( impGridID, mdse, mdst )
+
       if (firstCall) then
          twn = tcur
       else
@@ -1606,6 +1538,14 @@
          twn = tend
       endif
       tfn(:,j) = twn
+
+      call ESMF_StateGet(import, 'U10M', field, __RC__)
+      call FieldGather( field, nx, ny, wxn, rc=rc )
+      call ESMF_StateGet(import, 'V10M', field, __RC__)
+      call FieldGather( field, nx, ny, wyn, rc=rc )
+!      wxn = uwind
+!      wyn = vwind
+      
       if (firstCall) then
          tw0 = twn
          wx0 = wxn
@@ -1631,9 +1571,6 @@
 ! Sea ice concentration
 !
       j = 4
-      call MAPL_GetPointer(import, fraci, 'FRACI', __RC__)
-      icei = fraci
-
       call w3setg ( impGridID, mdse, mdst )
       call w3seti ( impGridID, mdse, mdst )
       if (firstCall) then
@@ -1644,6 +1581,13 @@
       tfn(:,j) = tin
 
 !ALT      call FieldGather( impField(i1), nx, ny, icei, rc=rc )
+      call MAPL_GetPointer(import, fraci, 'FRACI', __RC__)
+!      icei = fraci
+      call ESMF_StateGet(import, 'FRACI', field, __RC__)
+      call FieldGather( field, nx, ny, icei, __RC__ )
+
+!      icei = 0.0
+
       do imod = 1,nrgrd
          call w3setg ( imod, mdse, mdst )
          call w3setw ( imod, mdse, mdst )
@@ -1660,6 +1604,7 @@
 ! -------------------------------------------------------------------- /
 ! Post
 !
+      firstCall = .false.
       _RETURN(ESMF_SUCCESS)
 !/
 !/ End of GetImport -------------------------------------------------- /
@@ -1736,6 +1681,10 @@
 ! -------------------------------------------------------------------- /
 ! Prep
 !
+
+      _RETURN(0)
+! stubbed for now
+#if 0
       rc = ESMF_SUCCESS
       if ( noActiveExpFields ) return
 !ALT      call ESMF_VMWtime(wstime)
@@ -1839,6 +1788,7 @@
 !/
 !/ End of SetExport -------------------------------------------------- /
 !/
+#endif
       end subroutine SetExport
 !/ ------------------------------------------------------------------- /
 #undef METHOD
@@ -4048,51 +3998,19 @@
       integer :: k, ir, ip, count
       real(ESMF_KIND_RX) :: floc(n1,n2)
       real(ESMF_KIND_RX) :: floc1d(n1)
-!/PDLIB      real(ESMF_KIND_R8), pointer :: fldptr(:)
+      type(ESMF_VM) :: vm
+      integer :: status
 !
 ! -------------------------------------------------------------------- /
 ! Gather Field
 !
-      if (present(rc)) rc = ESMF_SUCCESS
 
-!      call ESMF_FieldWrite(field,fileName="ww3_import_dump.nc",overwrite=.true.,rc=rc)
-      if ( (GTYPE.eq.RLGTYPE).or.(GTYPE.eq.CLGTYPE) ) then
-        do k = 0,npet-1
-          call ESMF_FieldGather( field,  floc, rootPet=k, vm=vm, rc=rc )
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        enddo
-        fout(1:n1,1:n2) = floc(1:n1,1:n2)
-      elseif (GTYPE.eq.UNGTYPE) then
-        do k = 0,npet-1
-          call ESMF_FieldGather( field,  floc1d, rootPet=k, vm=vm, rc=rc )
-          if (ESMF_LogFoundError(rc, PASSTHRU)) return
-        enddo
-!/PDLIB      if ( LPDLIB == .FALSE. ) then
-        do k = 1, n1
-          fout(k,1) = floc1d(k)
-        enddo
-!/PDLIB      else
-!/PDLIB         count = 0
-!/PDLIB         do ir = 1, npet
-!/PDLIB           do ip = 1, rank(ir)%np
-!/PDLIB             count = count+1
-!/PDLIB             fout(rank(ir)%iplg(ip),1) = floc1d(count)
-!/PDLIB!             write(msg,*) trim(cname)//': count,ir,ip =',count, &
-!/PDLIB!                ir,ip
-!/PDLIB!             call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-!/PDLIB           enddo
-!/PDLIB         enddo
-!/PDLIB      endif
-
-!/PDLIB!      call ESMF_LogWrite(trim(cname)//': In FieldGather, fout(k,1)=', &
-!/PDLIB!          ESMF_LOGMSG_INFO)
-!/PDLIB!      do k = 1, n1
-!/PDLIB!         write(msg,*) trim(cname)//': fout(k,1) =',k, &
-!/PDLIB!          ' ',fout(k,1)
-!/PDLIB!         call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-!/PDLIB!      enddo
-
-      endif
+      call ESMF_VmGetCurrent(vm)
+      do k = 0,npet-1
+         call ESMF_FieldGather( field,  floc, rootPet=k, vm=vm, __RC__ )
+      enddo
+      fout(1:n1,1:n2) = floc(1:n1,1:n2)
+      _RETURN(ESMF_SUCCESS)
 !/
 !/ End of FieldGather ------------------------------------------------ /
 !/
