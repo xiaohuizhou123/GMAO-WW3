@@ -1675,16 +1675,14 @@
       integer :: status
       integer :: in, j1, jn
       real, pointer :: var(:,:) => null()
+      real, allocatable :: svar(:)
       type(ESMF_Grid) :: grid
       type(ESMF_VM) :: vm
       logical :: amIRoot
       integer :: comm
+      integer :: mype, npes
       integer :: mpistatus(MPI_STATUS_SIZE)
       integer, allocatable :: nseaLocal(:)
-
-      real, allocatable :: gvar(:,:), var1d(:), chk(:)
-      integer :: tag, n, mype, npes
-      integer :: ix, jx, isea, jsea
 
 #if defined(TEST_WMESMFMD) || defined(TEST_WMESMFMD_SETEXPORT)
       type(ESMF_State) :: dumpState
@@ -1737,58 +1735,29 @@
 ! Charnock
 !
 
-        allocate(chk(nseal), __STAT__)
-!ALT: alloc =.true. is here only for debuging
-      call MAPL_GetPointer(export, var, 'CHARNOCK', alloc=.true., __RC__)
-      call CalcCharnk( chk, __RC__ )
-
-!ALT: this should be a subroutine, let say sea2grid
-      allocate(gvar(nx,ny), __STAT__)
-      if (amIRoot) then
-         gvar = MAPL_Undef
-         do n = 0, npes-1
-            tag = n + 1000
-            allocate(var1d(nSeaLocal(n)), __STAT__)
-            if (n == MAPL_root) then
-               var1d = chk
-            else
-               call MPI_RECV(var1d,nSeaLocal(n),MPI_REAL,n,tag,comm,mpistatus,status)
-               _VERIFY(status)
-            end if
-            do jsea = 1, nSeaLocal(n)
-               isea = (n+1) + (jsea-1)*npes
-               ix = mapsf(isea,1)
-               jx = mapsf(isea,2)
-               gvar(ix,jx) = var1d(jsea)
-            end do
-            deallocate(var1d)
-         end do
-      else
-         tag = mype + 1000
-         call MPI_Send(chk, nseal, MPI_REAL, &
-              MAPL_Root, tag, comm, status)
-         _VERIFY(status)
+      call MAPL_GetPointer(export, var, 'CHARNOCK', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__)
+         call CalcCharnk( svar, __RC__ )
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
       end if
-
-       call MAPL_CommsBcast(vm, gvar, n=size(gvar), ROOT=MAPL_Root, rc=status)
-       _VERIFY(status)
-      var = gvar(i1:in,j1:jn)
-      deallocate(gvar)
-      deallocate(chk)
-
-      _RETURN(0)
-! stubbed for now
-#if 0
+      
 !
 ! -------------------------------------------------------------------- /
 ! Surface Roughness 
 !
-      i1 = FieldIndex( expFieldName, 'z0rlen', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      if ( expFieldActive(i1) ) then
-        call CalcRoughl( expField(i1), rc )
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      endif
+      call MAPL_GetPointer(export, var, 'Z0', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__)
+         call CalcRoughl( svar, __RC__ )
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+      _RETURN(0)
+! stubbed for now
+#if 0
 !
 ! -------------------------------------------------------------------- /
 ! Stokes Drift 3D
@@ -1854,6 +1823,55 @@
 !/ End of SetExport -------------------------------------------------- /
 !/
 #endif
+      deallocate(nSeaLocal)
+
+    contains
+
+      subroutine sea2grid(svar, gvar, rc)
+        real, intent(in)  :: svar(:) 
+        real, intent(out) :: gvar(:,:)
+        integer, optional :: rc
+
+        real, allocatable :: glob(:,:), var1d(:)
+        integer :: tag, n
+        integer :: ix, jx, isea, jsea
+        integer :: status
+
+        allocate(glob(nx,ny), __STAT__)
+        if (amIRoot) then
+           glob = MAPL_Undef
+           do n = 0, npes-1
+              tag = n + 1000
+              allocate(var1d(nSeaLocal(n)), __STAT__)
+              if (n == MAPL_root) then
+                 var1d = svar
+              else
+                 call MPI_RECV(var1d,nSeaLocal(n),MPI_REAL,n,tag,comm,mpistatus,status)
+                 _VERIFY(status)
+              end if
+              do jsea = 1, nSeaLocal(n)
+                 isea = (n+1) + (jsea-1)*npes
+                 ix = mapsf(isea,1)
+                 jx = mapsf(isea,2)
+                 glob(ix,jx) = var1d(jsea)
+              end do
+              deallocate(var1d)
+           end do
+        else
+           tag = mype + 1000
+           call MPI_Send(svar, nseal, MPI_REAL, &
+                MAPL_Root, tag, comm, status)
+           _VERIFY(status)
+        end if
+        
+        call MAPL_CommsBcast(vm, glob, n=size(glob), ROOT=MAPL_Root, rc=status)
+        _VERIFY(status)
+        gvar = glob(i1:in,j1:jn)
+        deallocate(glob)
+
+        _RETURN(0)
+      end subroutine sea2grid
+
       end subroutine SetExport
 !/ ------------------------------------------------------------------- /
 #undef METHOD
@@ -4557,18 +4575,18 @@
 !ALT      integer, save :: timeSlice = 1
       integer :: status
       integer :: ix, jx
-      real :: gvar(nx,ny)
 !
 ! -------------------------------------------------------------------- /
 !
       if ( natGridIsLocal .OR. .TRUE.) then
 
-        gvar = MAPL_Undef
         jsea_loop: do jsea = 1,nseal
 !/DIST          isea = iaproc + (jsea-1)*naproc
 !/SHRD          isea = jsea
           if ( firstCall ) then
             charn(jsea) = zero
+            tauwx = zero
+            tauwy = zero
 !/ST3            llws(:) = .true.
 !/ST3            ustar = zero
 !/ST3            ustdr = zero
@@ -4579,8 +4597,6 @@
 !/ST4            llws(:) = .true.
 !/ST4            ustar = zero
 !/ST4            ustdr = zero
-!/ST4            tauwx = zero
-!/ST4            tauwy = zero
 !/ST4            call w3spr4( va(:,jsea), cg(1:nk,isea), wn(1:nk,isea),   &
 !/ST4                         emean, fmean, fmean1, wnmean, amax,         &
 !/ST4                         u10(isea), u10d(isea), ustar, ustdr, tauwx, &
@@ -4610,7 +4626,7 @@
 !/ ------------------------------------------------------------------- /
 #undef METHOD
 #define METHOD "CalcRoughl"
-      subroutine CalcRoughl ( wrlField, rc )
+      subroutine CalcRoughl ( wrln, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -4659,8 +4675,8 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      type(ESMF_Field) :: wrlField
-      integer          :: rc
+      real, intent(OUT) :: wrln(:)
+      integer, optional, intent(OUT)  :: rc
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -4671,31 +4687,16 @@
       real    :: emean, fmean, fmean1, wnmean, amax, ustar, ustdr, &
                  tauwx, tauwy, cd, z0, fmeanws
       logical :: llws(nspec)
-      type(ESMF_Field) :: wrlnField
-      real(ESMF_KIND_RX), pointer :: wrln(:)
-      integer, save :: timeSlice = 1
 !
 ! -------------------------------------------------------------------- /
 !
-      rc = ESMF_SUCCESS
-
-      wrlnField = ESMF_FieldCreate( natGrid, natArraySpec2D, &
-        staggerLoc=natStaggerLoc, rc=rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-
-      call FieldFill( wrlnField, zeroValue, rc=rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-
-      if ( natGridIsLocal ) then
-
-        call ESMF_FieldGet( wrlnField, farrayPtr=wrln, rc=rc )
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-
         jsea_loop: do jsea = 1,nseal
 !/DIST          isea = iaproc + (jsea-1)*naproc
 !/SHRD          isea = jsea
           if ( firstCall ) then
             charn(jsea) = zero
+            tauwx = zero
+            tauwy = zero
 !/ST3            llws(:) = .true.
 !/ST3            ustar = zero
 !/ST3            ustdr = zero
@@ -4714,22 +4715,8 @@
           wrln(jsea) = charn(jsea)*ust(isea)**2/grav
         enddo jsea_loop
 
-      endif !natGridIsLocal
-
-      call ESMF_FieldRedist( wrlnField, wrlField, n2eRH, rc=rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-
-      call ESMF_FieldDestroy( wrlnField, rc=rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-
       firstCall = .false.
-
-#ifdef TEST_WMESMFMD_ROUGHL
-      call ESMF_FieldWrite( wrlField, "wmesmfmd_roughl_wrl.nc", &
-        overwrite=.true., timeSlice=timeSlice, rc=rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      timeSlice = timeSlice + 1
-#endif
+      _RETURN(0)
 !/
 !/ End of CalcRoughl ------------------------------------------------- /
 !/
