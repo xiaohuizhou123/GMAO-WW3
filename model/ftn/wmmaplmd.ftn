@@ -364,8 +364,8 @@
       VERIFY_(status)
 
 ! --- Model finalize method
-      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_FINALIZE, Finalize, rc=status)
-      VERIFY_(status)
+!ALT      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_FINALIZE, Finalize, rc=status)
+!ALT      VERIFY_(status)
 
 !
 ! -------------------------------------------------------------------- /
@@ -1755,7 +1755,6 @@
          deallocate(svar)
       end if
 
-      _RETURN(0)
 ! stubbed for now
 #if 0
 !
@@ -1824,6 +1823,7 @@
 !/
 #endif
       deallocate(nSeaLocal)
+      _RETURN(0)
 
     contains
 
