@@ -417,6 +417,13 @@
            DIMS           = MAPL_DimsHorzOnly,                     &
            VLOCATION      = MAPL_VLocationNone,     __RC__) 
 
+        call MAPL_AddExportSpec(GC,                                  &
+            SHORT_NAME     = 'SWH',                                  &
+            LONG_NAME      = 'sea_surface_wave_significant_height',  &
+            UNITS          = 'm',                                    &
+            DIMS           = MAPL_DimsHorzOnly,                      &
+            VLOCATION      = MAPL_VLocationNone,     __RC__)
+
 !
 ! -------------------------------------------------------------------- /
 !     Set profiling timers
@@ -1751,6 +1758,19 @@
       if (associated(var)) then
          allocate(svar(nseal), __STAT__)
          call CalcRoughl( svar, __RC__ )
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+!
+! -------------------------------------------------------------------- /
+! Significant Wave Height
+!
+      call MAPL_GetPointer(export, var, 'SWH', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = HS
+         where(svar == UNDEF) svar = MAPL_Undef
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
       end if
@@ -4712,7 +4732,11 @@
 !/ST4                         u10(isea), u10d(isea), ustar, ustdr, tauwx, &
 !/ST4                         tauwy, cd, z0, charn(jsea), llws, fmeanws )
           endif !firstCall
-          wrln(jsea) = charn(jsea)*ust(isea)**2/grav
+          if (ust(isea) == UNDEF .or. charn(jsea) == UNDEF) then
+             wrln(jsea) = MAPL_Undef
+          else
+             wrln(jsea) = charn(jsea)*ust(isea)**2/grav
+          end if
         enddo jsea_loop
 
       firstCall = .false.
