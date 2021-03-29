@@ -378,28 +378,28 @@
 ! --- IMPORT STATE:
 
       call MAPL_AddImportSpec(GC,                                  &
-          SHORT_NAME     = 'U10M',                                 &
-          LONG_NAME      = '10-meter_eastward_wind',               &
-          UNITS          = 'm s-1',                                &
-          DIMS           = MAPL_DimsHorzOnly,                      &
-          VLOCATION      = MAPL_VLocationNone,                     &
-          RESTART        = MAPL_RestartSkip,        __RC__) 
+           SHORT_NAME     = 'U10M',                                &
+           LONG_NAME      = '10-meter_eastward_wind',              &
+           UNITS          = 'm s-1',                               &
+           DIMS           = MAPL_DimsHorzOnly,                     &
+           VLOCATION      = MAPL_VLocationNone,                    &
+           RESTART        = MAPL_RestartSkip,        __RC__) 
   
       call MAPL_AddImportSpec(GC,                                  &
-          SHORT_NAME     = 'V10M',                                 &
-          LONG_NAME      = '10-meter_northward_wind',              &
-          UNITS          = 'm s-1',                                &
-          DIMS           = MAPL_DimsHorzOnly,                      &
-          VLOCATION      = MAPL_VLocationNone,                     &
-          RESTART        = MAPL_RestartSkip,        __RC__)
+           SHORT_NAME     = 'V10M',                                &
+           LONG_NAME      = '10-meter_northward_wind',             &
+           UNITS          = 'm s-1',                               &
+           DIMS           = MAPL_DimsHorzOnly,                     &
+           VLOCATION      = MAPL_VLocationNone,                    &
+           RESTART        = MAPL_RestartSkip,        __RC__)
 
       call MAPL_AddImportSpec(GC,                                  &
-          SHORT_NAME     = 'FRACI',                                &
-          LONG_NAME      = 'ice_covered_fraction_of_tile',         &
-          UNITS          = '1',                                    &
-          DIMS           = MAPL_DimsHorzOnly,                      &
-          VLOCATION      = MAPL_VLocationNone,                     &
-          RESTART        = MAPL_RestartSkip,        __RC__)
+           SHORT_NAME     = 'FRACI',                               &
+           LONG_NAME      = 'ice_covered_fraction_of_tile',        &
+           UNITS          = '1',                                   &
+           DIMS           = MAPL_DimsHorzOnly,                     &
+           VLOCATION      = MAPL_VLocationNone,                    &
+           RESTART        = MAPL_RestartSkip,        __RC__)
 
 
 ! --- EXPORT STATE:
@@ -417,12 +417,27 @@
            DIMS           = MAPL_DimsHorzOnly,                     &
            VLOCATION      = MAPL_VLocationNone,     __RC__) 
 
-        call MAPL_AddExportSpec(GC,                                  &
-            SHORT_NAME     = 'SWH',                                  &
-            LONG_NAME      = 'sea_surface_wave_significant_height',  &
-            UNITS          = 'm',                                    &
-            DIMS           = MAPL_DimsHorzOnly,                      &
-            VLOCATION      = MAPL_VLocationNone,     __RC__)
+      call MAPL_AddExportSpec(GC,                                  &
+           SHORT_NAME     = 'SWH',                                 &
+           LONG_NAME      = 'sea_surface_wave_significant_height', &
+           UNITS          = 'm',                                   &
+           DIMS           = MAPL_DimsHorzOnly,                     &
+           VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+           SHORT_NAME     = 'DW',                                  &
+           LONG_NAME      = 'bathymetry',                          &
+           UNITS          = 'm',                                   &
+           DIMS           = MAPL_DimsHorzOnly,                     &
+           VLOCATION      = MAPL_VLocationNone,      __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+           SHORT_NAME     = 'MWL',                                 &
+           LONG_NAME      = 'mean_wavelength',                     &
+           UNITS          = 'm',                                   &
+           DIMS           = MAPL_DimsHorzOnly,                     &
+           VLOCATION      = MAPL_VLocationNone,     __RC__)
+
 
 !
 ! -------------------------------------------------------------------- /
@@ -1774,6 +1789,33 @@
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
       end if
+
+!
+! -------------------------------------------------------------------- /
+! Water Depth
+!
+      call MAPL_GetPointer(export, var, 'DW', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = DW(1:NSEA)
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+!
+! -------------------------------------------------------------------- /
+! Mean Wave Length
+!
+      call MAPL_GetPointer(export, var, 'MWL', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = WLM
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
 
 ! stubbed for now
 #if 0
