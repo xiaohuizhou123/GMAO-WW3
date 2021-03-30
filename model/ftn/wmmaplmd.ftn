@@ -1796,10 +1796,10 @@
 !
       call MAPL_GetPointer(export, var, 'DW', __RC__)
       if (associated(var)) then
-         allocate(svar(nseal), __STAT__) 
+         allocate(svar(nsea), __STAT__) 
          svar = DW(1:NSEA)
          where(svar == UNDEF) svar = MAPL_Undef
-         call sea2grid(svar, var, __RC__)
+         call gsea2grid(svar, var, __RC__)
          deallocate(svar)
       end if
 
@@ -1933,6 +1933,26 @@
 
         _RETURN(0)
       end subroutine sea2grid
+
+      subroutine gsea2grid(svar, gvar, rc)
+        real, intent(in)  :: svar(:) 
+        real, intent(out) :: gvar(:,:)
+        integer, optional :: rc
+
+        integer :: ix, jx, isea, jsea
+        integer :: status
+
+        do jsea = 1, nSea
+           isea = jsea
+           ix = mapsf(isea,1)
+           jx = mapsf(isea,2)
+           if  ((ix >= i1) .and. (ix <= in) .and. &
+                (jx >= j1) .and. (jx <= jn)) then
+              gvar(ix-i1+1,jx-j1+1) = svar(isea)
+           end if
+        end do
+        _RETURN(0)
+      end subroutine gsea2grid
 
       end subroutine SetExport
 !/ ------------------------------------------------------------------- /
