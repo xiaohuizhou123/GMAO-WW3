@@ -771,6 +771,7 @@
       call MAPL_TimerAdd(GC, name='TOTAL'        , __RC__)
       call MAPL_TimerAdd(GC, name='INITIALIZE'   , __RC__)
       call MAPL_TimerAdd(GC, name='RUN'          , __RC__)
+      call MAPL_TimerAdd(GC, name='-DIAGNOSTICS' , __RC__)
       call MAPL_TimerAdd(GC, name='FINALIZE'     , __RC__)
 
 !
@@ -2136,6 +2137,37 @@
          allocate(svar(nsea), __STAT__) 
          svar = ICE(1:NSEA)
          where(svar == UNDEF) svar = MAPL_Undef
+         call gsea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+!
+! -------------------------------------------------------------------- /
+! Wind at 10m
+!
+      call MAPL_GetPointer(export, var, 'W10M', __RC__)
+      if (associated(var)) then
+         allocate(svar(nsea), __STAT__) 
+         svar = UA(1:NSEA)
+         where(svar == UNDEF) svar = MAPL_Undef
+         call gsea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+      call MAPL_GetPointer(export, var, 'U10M', __RC__)
+      if (associated(var)) then
+         allocate(svar(nsea), __STAT__) 
+         svar = UA(1:NSEA) * cos(UD(1:NSEA))
+         where(UA(1:NSEA) == UNDEF) svar = MAPL_Undef
+         call gsea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+      call MAPL_GetPointer(export, var, 'V10M', __RC__)
+      if (associated(var)) then
+         allocate(svar(nsea), __STAT__)
+         svar = UA(1:NSEA) * sin(UD(1:NSEA))
+         where(UA(1:NSEA) == UNDEF) svar = MAPL_Undef
          call gsea2grid(svar, var, __RC__)
          deallocate(svar)
       end if
