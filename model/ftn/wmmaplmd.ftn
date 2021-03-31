@@ -764,6 +764,31 @@
 !         VLOCATION      = MAPL_VLocationNone,     __RC__) 
 
 
+
+     call MAPL_AddExportSpec(GC,                                   &
+          SHORT_NAME     = 'T02',                                  &
+          LONG_NAME      = 'mean_wave_period_T02',                 &
+          UNITS          = 's',                                    &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+     call MAPL_AddExportSpec(GC,                                   &
+          SHORT_NAME     = 'T0M1',                                 &
+          LONG_NAME      = 'mean_wave_period_T0m1',                &
+          UNITS          = 's',                                    &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+     call MAPL_AddExportSpec(GC,                                   &
+          SHORT_NAME     = 'T01',                                  &
+          LONG_NAME      = 'mean_wave_period_T01',                 &
+          UNITS          = 's',                                    &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+  
+
+
+
 !
 ! -------------------------------------------------------------------- /
 !     Set profiling timers
@@ -2174,6 +2199,28 @@
 
 !
 ! -------------------------------------------------------------------- /
+! Surface Currents
+!
+      call MAPL_GetPointer(export, var, 'UW', __RC__)
+      if (associated(var)) then
+         allocate(svar(nsea), __STAT__) 
+         svar = CX(1:NSEA)
+         where(svar == UNDEF) svar = MAPL_Undef
+         call gsea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+      call MAPL_GetPointer(export, var, 'VW', __RC__)
+      if (associated(var)) then
+         allocate(svar(nsea), __STAT__) 
+         svar = CY(1:NSEA)
+         where(svar == UNDEF) svar = MAPL_Undef
+         call gsea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+!
+! -------------------------------------------------------------------- /
 ! Mean Wave Length
 !
       call MAPL_GetPointer(export, var, 'MWL', __RC__)
@@ -2193,6 +2240,33 @@
       if (associated(var)) then
          allocate(svar(nseal), __STAT__) 
          svar = T02
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+      call MAPL_GetPointer(export, var, 'T02', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = T02
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+      call MAPL_GetPointer(export, var, 'T0M1', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = T0M1
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+      call MAPL_GetPointer(export, var, 'T01', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = T01
          where(svar == UNDEF) svar = MAPL_Undef
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
