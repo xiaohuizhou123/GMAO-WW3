@@ -2101,11 +2101,10 @@
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      character(ESMF_MAXSTR) :: cname
-      integer :: i1, i2, i3
-      logical :: flpart = .false., floutg = .false., floutg2 = .true.
+
+!      logical :: flpart = .false., floutg = .false., floutg2 = .true.
       integer :: status
-      integer :: in, j1, jn
+      integer :: i1, in, j1, jn
       real, pointer :: var(:,:) => null()
       real, allocatable :: svar(:)
       type(ESMF_Grid) :: grid
@@ -2118,22 +2117,12 @@
       integer :: jsea
       real, allocatable :: dir(:)
 
-#if defined(TEST_WMESMFMD) || defined(TEST_WMESMFMD_SETEXPORT)
-      type(ESMF_State) :: dumpState
-      integer, save :: timeSlice = 1
-#endif
 !
 ! -------------------------------------------------------------------- /
 ! Prep
 !
 
-      rc = ESMF_SUCCESS
-      if ( noActiveExpFields ) return
-!ALT      call ESMF_VMWtime(wstime)
-      call ESMF_GridCompGet(gc, name=cname, __RC__)
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': entered SetExport', ESMF_LOGMSG_INFO)
-!
+
 ! -------------------------------------------------------------------- /
 ! Setup
 !
@@ -2143,9 +2132,6 @@
       call w3seti ( expGridID, mdse, mdst )
       call w3seto ( expGridID, mdse, mdst )
       call wmsetm ( expGridID, mdse, mdst )
-#ifdef USE_W3OUTG_FOR_EXPORT
-      if ( natGridIsLocal ) call w3outg( va, flpart, floutg, floutg2 )
-#endif
 
 	call ESMF_GridCompGet(gc, grid=grid, __RC__)
 	call MAPL_Grid_Interior(grid, i1, in, j1, jn)
@@ -2439,76 +2425,15 @@
       end if
 !
 
-
-
-! stubbed for now
-#if 0
-!
-! -------------------------------------------------------------------- /
-! Stokes Drift 3D
-!
-      i1 = FieldIndex( expFieldName, 'uscurr', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      i2 = FieldIndex( expFieldName, 'vscurr', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      if ( expFieldActive(i1) .and. &
-           expFieldActive(i2) ) then
-        call CalcStokes3D( va, expField(i1), expField(i2), rc )
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      endif
-!
-! -------------------------------------------------------------------- /
-! Bottom Currents
-!
-      i1 = FieldIndex( expFieldName, 'wbcuru', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      i2 = FieldIndex( expFieldName, 'wbcurv', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      i3 = FieldIndex( expFieldName, 'wbcurp', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      if ( expFieldActive(i1) .and. &
-           expFieldActive(i2) .and. &
-           expFieldActive(i3) ) then
-        call CalcBotcur( va, expField(i1), expField(i2), expField(i3), rc )
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      endif
-!
-! -------------------------------------------------------------------- /
-! Radiation stresses 2D
-!
-      i1 = FieldIndex( expFieldName, 'wavsuu', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      i2 = FieldIndex( expFieldName, 'wavsuv', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      i3 = FieldIndex( expFieldName, 'wavsvv', rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      if ( expFieldActive(i1) .and. &
-           expFieldActive(i2) .and. &
-           expFieldActive(i3) ) then
-        call CalcRadstr2D( va, expField(i1), expField(i2), expField(i3), rc )
-        if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      endif
 !
 ! -------------------------------------------------------------------- /
 ! Post
 !
-#if defined(TEST_WMESMFMD) || defined(TEST_WMESMFMD_SETEXPORT)
-      call NUOPC_ModelGet(gc, exportState=dumpState, rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      call NUOPC_Write(dumpState, overwrite=.true., &
-        fileNamePrefix="field_"//trim(cname)//"_export_", &
-        timeslice=timeSlice, relaxedFlag=.true., rc=rc)
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
-      timeSlice = timeSlice + 1
-#endif
-      rc = ESMF_SUCCESS
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': leaving SetExport', ESMF_LOGMSG_INFO)
+      deallocate(nSeaLocal)
+
 !/
 !/ End of SetExport -------------------------------------------------- /
 !/
-#endif
-      deallocate(nSeaLocal)
       _RETURN(0)
 
     contains
