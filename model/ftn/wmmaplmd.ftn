@@ -2102,7 +2102,7 @@
 !/ Local parameters
 !/
 
-!      logical :: flpart = .false., floutg = .false., floutg2 = .true.
+      logical :: flpart = .false., floutg = .true., floutg2 = .false.
       integer :: status
       integer :: i1, in, j1, jn
       real, pointer :: var(:,:) => null()
@@ -2132,6 +2132,8 @@
       call w3seti ( expGridID, mdse, mdst )
       call w3seto ( expGridID, mdse, mdst )
       call wmsetm ( expGridID, mdse, mdst )
+
+      call w3outg( va, flpart, floutg, floutg2 )
 
 	call ESMF_GridCompGet(gc, grid=grid, __RC__)
 	call MAPL_Grid_Interior(grid, i1, in, j1, jn)
