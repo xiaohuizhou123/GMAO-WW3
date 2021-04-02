@@ -2115,6 +2115,8 @@
       integer :: mype, npes
       integer :: mpistatus(MPI_STATUS_SIZE)
       integer, allocatable :: nseaLocal(:)
+      integer :: jsea
+      real, allocatable :: dir(:)
 
 #if defined(TEST_WMESMFMD) || defined(TEST_WMESMFMD_SETEXPORT)
       type(ESMF_State) :: dumpState
@@ -2190,30 +2192,49 @@
 !
       call MAPL_GetPointer(export, var, 'USTAR', __RC__)
       if (associated(var)) then
-         allocate(svar(nsea), __STAT__) 
-         svar = UST(1:NSEA)
+         allocate(svar(nseal), __STAT__) 
+         call global2local(UST(1:NSEA),svar)
          where(svar == UNDEF) svar = MAPL_Undef
-         call gsea2grid(svar, var, __RC__)
+         call sea2grid(svar, var, __RC__)
          deallocate(svar)
       end if
 
       call MAPL_GetPointer(export, var, 'UUST', __RC__)
       if (associated(var)) then
-         allocate(svar(nsea), __STAT__) 
-         svar = UST(1:NSEA) * cos(USTDIR(1:NSEA))
-         where(UST(1:NSEA) == UNDEF) svar = MAPL_Undef
-         call gsea2grid(svar, var, __RC__)
+         allocate(svar(nseal), __STAT__) 
+         call global2local(UST(1:NSEA),svar)
+         allocate(dir(nseal), __STAT__) 
+         call global2local(USTDIR(1:NSEA),dir)
+         do jsea = 1,nseal
+            if (svar(jsea) == UNDEF) then
+               svar(jsea) = MAPL_Undef
+            else 
+               svar(jsea) = svar(jsea) * cos(dir(jsea))
+            end if
+         end do
+         call sea2grid(svar, var, __RC__)
+         deallocate(dir)
          deallocate(svar)
       end if
 
       call MAPL_GetPointer(export, var, 'VUST', __RC__)
       if (associated(var)) then
-         allocate(svar(nsea), __STAT__) 
-         svar = UST(1:NSEA) * sin(USTDIR(1:NSEA))
-         where(UST(1:NSEA) == UNDEF) svar = MAPL_Undef
-         call gsea2grid(svar, var, __RC__)
+         allocate(svar(nseal), __STAT__) 
+         call global2local(UST(1:NSEA),svar)
+         allocate(dir(nseal), __STAT__) 
+         call global2local(USTDIR(1:NSEA),dir)
+         do jsea = 1,nseal
+            if (svar(jsea) == UNDEF) then
+               svar(jsea) = MAPL_Undef
+            else 
+               svar(jsea) = svar(jsea) * sin(dir(jsea))
+            end if
+         end do
+         call sea2grid(svar, var, __RC__)
+         deallocate(dir)
          deallocate(svar)
       end if
+
 !
 ! -------------------------------------------------------------------- /
 ! Significant Wave Height
@@ -2545,6 +2566,7 @@
         integer :: ix, jx, isea, jsea
         integer :: status
 
+        gvar = MAPL_Undef
         do jsea = 1, nSea
            isea = jsea
            ix = mapsf(isea,1)
@@ -2556,6 +2578,19 @@
         end do
         _RETURN(0)
       end subroutine gsea2grid
+
+      subroutine global2local(gvar, svar)
+        real, intent(in)  :: gvar(:)
+        real, intent(out) :: svar(:) 
+
+        integer :: isea, jsea
+
+        do jsea = 1, nSeaL
+           isea = (mype+1) + (jsea-1)*npes
+           svar(jsea) = gvar(isea)
+        end do
+        return
+      end subroutine global2local
 
       end subroutine SetExport
 !/ ------------------------------------------------------------------- /
