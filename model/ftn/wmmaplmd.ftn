@@ -645,6 +645,42 @@
           DIMS           = MAPL_DimsHorzOnly,                      &
           VLOCATION      = MAPL_VLocationNone,     __RC__)
 
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'FAW',                                  &
+          LONG_NAME      = 'wind_to_wave_energy_flux',             &
+          UNITS          = 'W m-2',                                &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'UTAW',                                 &
+          LONG_NAME      = 'eastward_wave_supported_wind_stress',  &
+          UNITS          = 'm2 s-2',                               &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'VTAW',                                 &
+          LONG_NAME      = 'nortward_wave_supported_wind_stress',  &
+          UNITS          = 'm2 s-2',                               &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'UTWA',                                 &
+          LONG_NAME      = 'eastward_wave_to_wind_stress',         &
+          UNITS          = 'm2 s-2',                               &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'VTWA',                                 &
+          LONG_NAME      = 'northward_wave_to_wind_stress',        &
+          UNITS          = 'm2 s-2',                               &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+
 !     call MAPL_AddExportSpec(GC,                                  &
 !         SHORT_NAME     = 'EDFX',                                 &
 !         LONG_NAME      = 'wave_energy_dissipation_flux_x_component', &
@@ -2445,7 +2481,60 @@
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
       end if
-
+!
+! -------------------------------------------------------------------- /
+! Wind to Wave Energy Flux
+!
+      call MAPL_GetPointer(export, var, 'FAW', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = PHIAW
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+!
+! -------------------------------------------------------------------- /
+! Wave Supported Wind Stress
+!
+      call MAPL_GetPointer(export, var, 'UTAW', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = TAUWIX
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+ 
+      call MAPL_GetPointer(export, var, 'VTAW', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = TAUWIY
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+!
+! -------------------------------------------------------------------- /
+! Wave to Wind Stress
+!
+      call MAPL_GetPointer(export, var, 'UTWA', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = TAUWNX
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+ 
+      call MAPL_GetPointer(export, var, 'VTWA', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = TAUWNY
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
 
 
 !
