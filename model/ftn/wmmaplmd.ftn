@@ -573,6 +573,22 @@
           DIMS           = MAPL_DimsHorzOnly,                      &
           VLOCATION      = MAPL_VLocationNone,     __RC__)
 
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'MSSU',                                 &
+          LONG_NAME      = 'downwave_mean_square_slope',           &
+          UNITS          = '1',                                    &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'MSSC',                                 &
+          LONG_NAME      = 'crosswave_mean_square_slope',          &
+          UNITS          = '1',                                    &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+
+
 !     call MAPL_AddExportSpec(GC,                                  &
 !         SHORT_NAME     = 'SWHW',                                 &
 !         LONG_NAME      = 'sea_surface_wind_wave_significant_height', &
@@ -2382,7 +2398,6 @@
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
       end if
-
 !
 ! -------------------------------------------------------------------- /
 ! Maximum Wave Height
@@ -2588,8 +2603,6 @@
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
       end if
-
-
 !
 ! -------------------------------------------------------------------- /
 ! Mean wave direction
@@ -2757,6 +2770,27 @@
       if (associated(var)) then
          allocate(svar(nseal), __STAT__) 
          svar = WHITECAP(1:NSEA,4)
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+!
+! -------------------------------------------------------------------- /
+! Mean Square Slope 
+!
+      call MAPL_GetPointer(export, var, 'MSSU', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = MSSX
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+ 
+      call MAPL_GetPointer(export, var, 'MSSC', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = MSSY
          where(svar == UNDEF) svar = MAPL_Undef
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
