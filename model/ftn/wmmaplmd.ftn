@@ -688,6 +688,27 @@
           DIMS           = MAPL_DimsHorzOnly,                      &
           VLOCATION      = MAPL_VLocationNone,     __RC__)
 
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'UTWO',                                 &
+          LONG_NAME      = 'eastward_wave_to_ocean_stress',        &
+          UNITS          = 'm2 s-2',                               &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'VTWO',                                 &
+          LONG_NAME      = 'northward_wave_to_ocean_stress',       &
+          UNITS          = 'm2 s-2',                               &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'FOC',                                  &
+          LONG_NAME      = 'wave_to_ocean_energy_flux',            &
+          UNITS          = 'W m-2',                                &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
 
 !     call MAPL_AddExportSpec(GC,                                  &
 !         SHORT_NAME     = 'EDFX',                                 &
@@ -2587,7 +2608,40 @@
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
       end if
+!
+! -------------------------------------------------------------------- /
+! Wave to Ocean Stress
+!
+      call MAPL_GetPointer(export, var, 'UTWO', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = TAUOX
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+ 
+      call MAPL_GetPointer(export, var, 'VTWO', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = TAUOY
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
 
+      call MAPL_GetPointer(export, var, 'FOC', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = PHIOC
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+!
+! -------------------------------------------------------------------- /
+! Whitecaps
+!
       call MAPL_GetPointer(export, var, 'WCC', __RC__)
       if (associated(var)) then
          allocate(svar(nseal), __STAT__) 
