@@ -538,6 +538,41 @@
           DIMS           = MAPL_DimsHorzOnly,                      &
           VLOCATION      = MAPL_VLocationNone,     __RC__)
 
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'HIG',                                  &
+          LONG_NAME      = 'infragravity_wave_height',             &
+          UNITS          = 'm',                                    &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'HMAXE',                                &
+          LONG_NAME      = 'expected_maximum_wave_height_(linear, 1st order)', &
+          UNITS          = 'm',                                    &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'HCMAXE',                               &
+          LONG_NAME      = 'expected_maximum_wave_height_from_crest_(linear, 1st order)', &
+          UNITS          = 'm',                                    &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'HMAXD',                                &
+          LONG_NAME      = 'STD_of_maximum_wave_height_(linear, 1st order)', &
+          UNITS          = 'm',                                    &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'HCMAXD',                               &
+          LONG_NAME      = 'STD_of_maximum_wave_height_from_crest_(linear, 1st order)', &
+          UNITS          = 'm',                                    &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
 !     call MAPL_AddExportSpec(GC,                                  &
 !         SHORT_NAME     = 'SWHW',                                 &
 !         LONG_NAME      = 'sea_surface_wind_wave_significant_height', &
@@ -615,8 +650,6 @@
           DIMS           = MAPL_DimsHorzOnly,                      &
           VLOCATION      = MAPL_VLocationNone,     __RC__)
 
-
-
 !     call MAPL_AddExportSpec(GC,                                  &
 !         SHORT_NAME     = 'DCP0',                                 &
 !         LONG_NAME      = 'dominant_phase_speed_intrinsic',       &
@@ -644,7 +677,6 @@
           UNITS          = 'm s-1',                                &
           DIMS           = MAPL_DimsHorzOnly,                      &
           VLOCATION      = MAPL_VLocationNone,     __RC__)
-
 
       call MAPL_AddExportSpec(GC,                                  &
           SHORT_NAME     = 'CGE',                                  &
@@ -2334,6 +2366,58 @@
       if (associated(var)) then
          allocate(svar(nseal), __STAT__) 
          svar = HS
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+!
+! -------------------------------------------------------------------- /
+! Infragravity Wave Height
+!
+      call MAPL_GetPointer(export, var, 'HIG', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = HSIG
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+!
+! -------------------------------------------------------------------- /
+! Maximum Wave Height
+!
+      call MAPL_GetPointer(export, var, 'HMAXE', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = HMAXE
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+      call MAPL_GetPointer(export, var, 'HCMAXE', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = HCMAXE
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+      call MAPL_GetPointer(export, var, 'HMAXD', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = HMAXD
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+      call MAPL_GetPointer(export, var, 'HCMAXD', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = HCMAXD
          where(svar == UNDEF) svar = MAPL_Undef
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
