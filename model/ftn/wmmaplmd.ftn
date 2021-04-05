@@ -745,7 +745,6 @@
           VLOCATION      = MAPL_VLocationNone,     __RC__)
 
 
-
       call MAPL_AddExportSpec(GC,                                  &
           SHORT_NAME     = 'Z0',                                   &
           LONG_NAME      = 'surface_roughness',                    &
@@ -859,7 +858,38 @@
          UNITS          = '1',                                     &
          DIMS           = MAPL_DimsHorzOnly,                       &
          VLOCATION      = MAPL_VLocationNone,     __RC__)
- 
+
+     call MAPL_AddExportSpec(GC,                                   &
+         SHORT_NAME     = 'WCC',                                   &
+         LONG_NAME      = 'whitecap_coverage',                     &
+         UNITS          = '1',                                     &
+         DIMS           = MAPL_DimsHorzOnly,                       &
+         VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+     call MAPL_AddExportSpec(GC,                                   &
+         SHORT_NAME     = 'WCF',                                   &
+         LONG_NAME      = 'whitecap_foam_thickness',               &
+         UNITS          = 'm',                                     &
+         DIMS           = MAPL_DimsHorzOnly,                       &
+         VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+     call MAPL_AddExportSpec(GC,                                   &
+         SHORT_NAME     = 'WCH',                                   &
+         LONG_NAME      = 'significant breaking wave height',      &
+         UNITS          = 'm',                                     &
+         DIMS           = MAPL_DimsHorzOnly,                       &
+         VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+     call MAPL_AddExportSpec(GC,                                   &
+         SHORT_NAME     = 'WCM',                                   &
+         LONG_NAME      = 'whitecap_moment',                       &
+         UNITS          = 'm',                                     &
+         DIMS           = MAPL_DimsHorzOnly,                       &
+         VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+
+
+
      !
      ! Sea spray diagnostics
      !
@@ -2536,6 +2566,41 @@
          deallocate(svar)
       end if
 
+      call MAPL_GetPointer(export, var, 'WCC', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = WHITECAP(1:NSEA,1)
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+      call MAPL_GetPointer(export, var, 'WCF', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = WHITECAP(1:NSEA,2)
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+      call MAPL_GetPointer(export, var, 'WCH', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = WHITECAP(1:NSEA,3)
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+      call MAPL_GetPointer(export, var, 'WCM', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = WHITECAP(1:NSEA,4)
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
 
 !
 ! -------------------------------------------------------------------- /
