@@ -608,6 +608,14 @@
           DIMS           = MAPL_DimsHorzOnly,                      &
           VLOCATION      = MAPL_VLocationNone,     __RC__)
  
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'TWS',                                  &
+          LONG_NAME      = 'Wind_sea_mean_period_T0M1',            &
+          UNITS          = 's',                                    &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+
 
 !     call MAPL_AddExportSpec(GC,                                  &
 !         SHORT_NAME     = 'DCP0',                                 &
@@ -875,7 +883,7 @@
 
      call MAPL_AddExportSpec(GC,                                   &
          SHORT_NAME     = 'WCH',                                   &
-         LONG_NAME      = 'significant breaking wave height',      &
+         LONG_NAME      = 'significant_breaking_wave_height',      &
          UNITS          = 'm',                                     &
          DIMS           = MAPL_DimsHorzOnly,                       &
          VLOCATION      = MAPL_VLocationNone,     __RC__)
@@ -883,7 +891,7 @@
      call MAPL_AddExportSpec(GC,                                   &
          SHORT_NAME     = 'WCM',                                   &
          LONG_NAME      = 'whitecap_moment',                       &
-         UNITS          = 'm',                                     &
+         UNITS          = '1',                                     &
          DIMS           = MAPL_DimsHorzOnly,                       &
          VLOCATION      = MAPL_VLocationNone,     __RC__)
 
@@ -2463,6 +2471,20 @@
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
       end if
+!
+! -------------------------------------------------------------------- /
+! Wind sea mean period T0M1
+!
+      call MAPL_GetPointer(export, var, 'TWS', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__)
+         svar = TWS
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+
 !
 ! -------------------------------------------------------------------- /
 ! Mean wave direction
