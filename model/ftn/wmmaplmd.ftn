@@ -2286,23 +2286,23 @@
 
       call w3outg( va, flpart, floutg, floutg2 )
 
-	call ESMF_GridCompGet(gc, grid=grid, __RC__)
-	call MAPL_Grid_Interior(grid, i1, in, j1, jn)
+      call ESMF_GridCompGet(gc, grid=grid, __RC__)
+      call MAPL_Grid_Interior(grid, i1, in, j1, jn)
 
 ! gather info for sea-points only to regular grid transforms
 !-----------------------------------------------------------
-	call ESMF_GridCompGet(gc, vm=vm, __RC__)
-	call ESMF_VMGet(vm, localPet=mype, petCount=npes, mpiCommunicator=comm, __RC__)
-	amIRoot = (mype==MAPL_Root)
-        if (amIRoot) then
-           allocate(nSeaLocal(0:npes-1), __STAT__)
-        else
-           allocate(nSeaLocal(0), __STAT__)
-        end if
-        call MPI_Gather(nseal, 1, MPI_INTEGER, &
-                        nSeaLocal, 1, MPI_INTEGER, &
-                        MAPL_Root, comm, status)
-        _VERIFY(status)
+      call ESMF_GridCompGet(gc, vm=vm, __RC__)
+      call ESMF_VMGet(vm, localPet=mype, petCount=npes, mpiCommunicator=comm, __RC__)
+      amIRoot = (mype==MAPL_Root)
+      if (amIRoot) then
+         allocate(nSeaLocal(0:npes-1), __STAT__)
+      else
+         allocate(nSeaLocal(0), __STAT__)
+      end if
+      call MPI_Gather(nseal, 1, MPI_INTEGER, &
+                      nSeaLocal, 1, MPI_INTEGER, &
+                      MAPL_Root, comm, status)
+      _VERIFY(status)
 !
 ! -------------------------------------------------------------------- /
 ! Charnock
