@@ -155,6 +155,7 @@
 !/ST3      use W3SRC3MD, only: W3SPR3
 !/ST4      use W3SRC4MD, only: W3SPR4
       use W3IOGOMD, only: W3OUTG
+      USE W3IORSMD
 !/
 !/ Specify default data typing
 !/
@@ -338,7 +339,6 @@
 ! Prep
 !
       rc = ESMF_SUCCESS
-
 !
 ! -------------------------------------------------------------------- /
 !     Get my name and set-up traceback handle
@@ -356,16 +356,15 @@
 !
 
 ! --- Set entry points for initialize method
-      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_INITIALIZE, Initialize, rc=status)
-      VERIFY_(status)
+      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_INITIALIZE, Initialize, __RC__)
 
-! --- Model advance method
-      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_RUN, Run, rc=status)
-      VERIFY_(status)
+! --- Model run/advance method
+      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_RUN, Run, __RC__)
 
 ! --- Model finalize method
-!ALT      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_FINALIZE, Finalize, rc=status)
-!ALT      VERIFY_(status)
+      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_FINALIZE, Finalize, __RC__)
+!ALT      call MAPL_GridCompSetEntryPoint(GC, ESMF_METHOD_WRITERESTART, Record, __RC__)
+
 
 !
 ! -------------------------------------------------------------------- /
@@ -1575,108 +1574,6 @@
 !ALT      end subroutine InitializeP3
       _RETURN(ESMF_SUCCESS)
     end subroutine Initialize
-!/ ------------------------------------------------------------------- /
-#undef METHOD
-#define METHOD "Finalize"
-      subroutine Finalize ( gc, impState, expState, extClock, rc )
-!/
-!/                  +-----------------------------------+
-!/                  | WAVEWATCH III           NOAA/NCEP |
-!/                  |        T. J. Campbell, NRL        |
-!/                  |                        FORTRAN 90 |
-!/                  | Last update :         09-Aug-2017 |
-!/                  +-----------------------------------+
-!/
-!/    20-Jan-2017 : Origination.                        ( version 6.02 )
-!/    09-Aug-2017 : Add clean up of local allocations   ( version 6.03 )
-!/
-!  1. Purpose :
-!
-!     Finalize wave model
-!
-!  2. Method :
-!
-!  3. Parameters :
-!
-!     Parameter list
-!     ----------------------------------------------------------------
-!       gc     Type   I/O Gridded component
-!       impState  Type   I/O Import state
-!       expState  Type   I/O Export state
-!       extClock  Type   I   External clock
-!       rc        Int.   O   Return code
-!     ----------------------------------------------------------------
-!
-!  4. Subroutines used :
-!
-!      Name      Type  Module   Description
-!     ----------------------------------------------------------------
-!      WMFINL    Subr. WMFINLMD Wave model finalization
-!     ----------------------------------------------------------------
-!
-!  5. Called by :
-!
-!  6. Error messages :
-!
-!  7. Remarks :
-!
-!  8. Structure :
-!
-!  9. Switches :
-!
-! 10. Source code :
-!
-!/ ------------------------------------------------------------------- /
-!/
-!/ ------------------------------------------------------------------- /
-!/ Parameter list
-!/
-      type(ESMF_GridComp) :: gc
-      type(ESMF_State)    :: impState
-      type(ESMF_State)    :: expState
-      type(ESMF_Clock)    :: extClock
-      integer,intent(out) :: rc
-!/
-!/ ------------------------------------------------------------------- /
-!/ Local parameters
-!/
-      character(ESMF_MAXSTR) :: cname
-      character(len=ESMF_MAXSTR) :: Iam
-      integer                    :: status
-      integer :: i
-!
-! -------------------------------------------------------------------- /
-! Prep
-!
-      rc = ESMF_SUCCESS
-!ALT      call ESMF_VMWtime(wstime)
-      call ESMF_GridCompGet(gc, name=cname, __RC__)
-!
-! -------------------------------------------------------------------- /
-! 1.  Finalize the wave model
-!
-      call wmfinl
-!
-! -------------------------------------------------------------------- /
-! 2.  Clean up ESMF data structures
-!
-!
-! -------------------------------------------------------------------- /
-! 3.  Clean up locally allocated data structures
-!
-      if (allocated(zl)) then
-        deallocate (zl, __STAT__)
-      endif
-!
-! -------------------------------------------------------------------- /
-! Post
-!
-      rc = ESMF_SUCCESS
-      _RETURN(ESMF_SUCCESS)
-!/
-!/ End of Finalize --------------------------------------------------- /
-!/
-      end subroutine Finalize
 !/ ------------------------------------------------------------------- /
 #undef METHOD
 #define METHOD "DataInitialize"
@@ -6446,6 +6343,85 @@
 !/
       end subroutine CalcStokes3D
 !/ ------------------------------------------------------------------- /
+
+!/ ------------------------------------------------------------------- /
+
+      subroutine Record ( gc, import, export, clock, rc )
+! !ARGUMENTS:
+
+        type(ESMF_GridComp), intent(inout) :: GC     ! Gridded component 
+        type(ESMF_State),    intent(inout) :: IMPORT ! Import state
+        type(ESMF_State),    intent(inout) :: EXPORT ! Export state
+        type(ESMF_Clock),    intent(inout) :: CLOCK  ! The clock
+        integer, optional,   intent(  out) :: RC     ! Error code
+
+	integer :: status
+        character(len=ESMF_MAXSTR)      :: Iam
+        integer :: unit
+        integer :: itest ! this is intent(out) argument to W3IORS
+        integer, parameter :: imod=1 ! grid id for the M3IORS (defaults to 1 if not supplied)
+        character(len=ESMF_MAXSTR)      :: COMP_NAME
+
+        real :: dummy
+
+        Iam = 'Record'
+        call ESMF_GridCompGet(GC, NAME=COMP_NAME, rc=status)
+        VERIFY_(status)
+
+        Iam = trim(COMP_NAME) // Iam
+
+        unit = 10 ! ALT: decided to not use MAPL routine GETFILEUNIT
+                  ! to avoid some unnecessary bookkeeping and to
+                  ! to make sure that every PE gets the same unit
+
+        CALL W3IORS ('HOT', unit, dummy, ITEST, IMOD )
+
+        ! this is needed to write IMPORT checkpoint and proper timers reporting
+	call MAPL_GenericRecord( gc, import, export, clock, __RC__ )
+
+        RETURN_(ESMF_SUCCESS)
+      end subroutine Record
+
+      subroutine Finalize ( gc, import, export, clock, rc )
+! !ARGUMENTS:
+
+        type(ESMF_GridComp), intent(inout) :: GC     ! Gridded component 
+        type(ESMF_State),    intent(inout) :: IMPORT ! Import state
+        type(ESMF_State),    intent(inout) :: EXPORT ! Export state
+        type(ESMF_Clock),    intent(inout) :: CLOCK  ! The clock
+        integer, optional,   intent(  out) :: RC     ! Error code
+
+	integer :: status
+        character(len=ESMF_MAXSTR)      :: Iam
+        integer :: unit
+        integer :: itest ! this is intent(out) argument to W3IORS
+        integer, parameter :: imod=1 ! grid id for the M3IORS (defaults to 1 if not supplied)
+        character(len=ESMF_MAXSTR)      :: COMP_NAME
+
+        real :: dummy
+
+        Iam = 'Finalize'
+        call ESMF_GridCompGet(GC, NAME=COMP_NAME, rc=status)
+        VERIFY_(status)
+
+        Iam = trim(COMP_NAME) // Iam
+
+        unit = 10 ! ALT: decided to not use MAPL routine GETFILEUNIT
+                  ! to avoid some unnecessary bookkeeping and to
+                  ! to make sure that every PE gets the same unit
+
+        CALL W3IORS ('HOT', unit, dummy, ITEST, IMOD )
+
+!       Finalize the wave model
+!
+        call wmfinl
+
+        ! this is needed to write IMPORT checkpoint and proper timers reporting
+	call MAPL_GenericFinalize( gc, import, export, clock, __RC__ )
+
+        RETURN_(ESMF_SUCCESS)
+      end subroutine Finalize
+
 !/
 !/ End of module WMMAPLMD -------------------------------------------- /
 !/
