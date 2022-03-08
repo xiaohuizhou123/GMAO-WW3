@@ -963,7 +963,40 @@
          DIMS           = MAPL_DimsHorzOnly,                       &
          VLOCATION      = MAPL_VLocationNone,     __RC__)
 
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'TUS',                                  &
+          LONG_NAME      = 'stokes transport',                     &
+          UNITS          = 'm2 s-1',                               &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
 
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'UTUS',                                 &
+          LONG_NAME      = 'eastward stokes transport',            &
+          UNITS          = 'm2 s-1',                               &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'VTUS',                                 &
+          LONG_NAME      = 'northward stokes transport',           &
+          UNITS          = 'm2 s-1',                               &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'UUSS',                                 &
+          LONG_NAME      = 'eastward surface stokes drift',        &
+          UNITS          = 'm  s-1',                               &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
+
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'VUSS',                                 &
+          LONG_NAME      = 'northward surface stokes drift',       &
+          UNITS          = 'm s-1',                                &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
 
 
      !
@@ -2270,7 +2303,6 @@
          deallocate(dir)
          deallocate(svar)
       end if
-
 !
 ! -------------------------------------------------------------------- /
 ! Significant Wave Height
@@ -2639,7 +2671,7 @@
       call MAPL_GetPointer(export, var, 'WCC', __RC__)
       if (associated(var)) then
          allocate(svar(nseal), __STAT__) 
-         svar = WHITECAP(1:NSEA,1)
+         svar = WHITECAP(:,1)
          where(svar == UNDEF) svar = MAPL_Undef
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
@@ -2648,7 +2680,7 @@
       call MAPL_GetPointer(export, var, 'WCF', __RC__)
       if (associated(var)) then
          allocate(svar(nseal), __STAT__) 
-         svar = WHITECAP(1:NSEA,2)
+         svar = WHITECAP(:,2)
          where(svar == UNDEF) svar = MAPL_Undef
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
@@ -2657,7 +2689,7 @@
       call MAPL_GetPointer(export, var, 'WCH', __RC__)
       if (associated(var)) then
          allocate(svar(nseal), __STAT__) 
-         svar = WHITECAP(1:NSEA,3)
+         svar = WHITECAP(:,3)
          where(svar == UNDEF) svar = MAPL_Undef
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
@@ -2666,7 +2698,7 @@
       call MAPL_GetPointer(export, var, 'WCM', __RC__)
       if (associated(var)) then
          allocate(svar(nseal), __STAT__) 
-         svar = WHITECAP(1:NSEA,4)
+         svar = WHITECAP(:,4)
          where(svar == UNDEF) svar = MAPL_Undef
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
@@ -2692,7 +2724,75 @@
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
       end if
+!
+! -------------------------------------------------------------------- /
+! Stokes Transport
+!
+      call MAPL_GetPointer(export, var, 'TUS', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = TUSX
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
 
+      call MAPL_GetPointer(export, var, 'UTUS', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = TUSX
+         allocate(dir(nseal), __STAT__) 
+         dir  = TUSY
+         do jsea = 1,nseal
+            if (svar(jsea) == UNDEF) then
+               svar(jsea) = MAPL_Undef
+            else 
+               svar(jsea) = svar(jsea) * sin(dir(jsea))
+            end if
+         end do
+         call sea2grid(svar, var, __RC__)
+         deallocate(dir)
+         deallocate(svar)
+      end if
+
+      call MAPL_GetPointer(export, var, 'VTUS', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = TUSX
+         allocate(dir(nseal), __STAT__) 
+         dir  = TUSY
+         do jsea = 1,nseal
+            if (svar(jsea) == UNDEF) then
+               svar(jsea) = MAPL_Undef
+            else 
+               svar(jsea) = svar(jsea) * cos(dir(jsea))
+            end if
+         end do
+         call sea2grid(svar, var, __RC__)
+         deallocate(dir)
+         deallocate(svar)
+      end if
+!
+! -------------------------------------------------------------------- /
+! Surface Stokes Drift
+!
+      call MAPL_GetPointer(export, var, 'UUSS', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = USSX
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+
+      call MAPL_GetPointer(export, var, 'VUSS', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = USSY
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
 !
 ! -------------------------------------------------------------------- /
 ! Post
