@@ -800,7 +800,7 @@
 !         VLOCATION      = MAPL_VLocationNone,     __RC__)
 
       call MAPL_AddExportSpec(GC,                                  &
-          SHORT_NAME     = 'USTAR',                                &
+          SHORT_NAME     = 'WM_USTAR',                             &
           LONG_NAME      = 'friction_velosity',                    &
           UNITS          = 'm s-1',                                &
           DIMS           = MAPL_DimsHorzOnly,                      &
@@ -997,26 +997,6 @@
           UNITS          = 'm s-1',                                &
           DIMS           = MAPL_DimsHorzOnly,                      &
           VLOCATION      = MAPL_VLocationNone,     __RC__)
-
-
-     !
-     ! Sea spray diagnostics
-     !
-     call MAPL_AddExportSpec(GC,                                   &
-          SHORT_NAME      = 'SHFX_SPRAY',                          &
-        LONG_NAME       = 'sensible_heat_contribution_from_sea_spray', &
-        UNITS           = 'W m-2',                                 &
-        DIMS            = MAPL_DimsHorzOnly,                       &
-        VLOCATION       = MAPL_VLocationNone,     __RC__)
-
-     call MAPL_AddExportSpec(GC,                                   &
-        SHORT_NAME      = 'LHFX_SPRAY',                            &
-        LONG_NAME       = 'latent_heat_contribution_from_sea_spray', &
-        UNITS           = 'W m-2',                                 &
-        DIMS            = MAPL_DimsHorzOnly,                       &
-        VLOCATION       = MAPL_VLocationNone,     __RC__)
-
-
 
 
 !
@@ -1807,8 +1787,6 @@
       logical :: lerr
       integer :: status
 
-      real, pointer, dimension(:,:) :: SHFX_SPRAY   => null()
-      real, pointer, dimension(:,:) :: LHFX_SPRAY   => null()
 !
 ! -------------------------------------------------------------------- /
 ! Prep
@@ -1881,13 +1859,6 @@
       call SetExport(gc, export, __RC__)
  !ALT old form     call SetExport(gc, __RC__)
 
-
-
-      call MAPL_GetPointer(EXPORT, LHFX_SPRAY,   'LHFX_SPRAY', alloc=.true.,  __RC__)
-      call MAPL_GetPointer(EXPORT, SHFX_SPRAY,   'SHFX_SPRAY', alloc=.true.,  __RC__)
-
-      LHFX_SPRAY = 0.0
-      SHFX_SPRAY = 0.0
 
 !
 ! -------------------------------------------------------------------- /
@@ -2259,7 +2230,7 @@
 ! -------------------------------------------------------------------- /
 ! Friction velocity
 !
-      call MAPL_GetPointer(export, var, 'USTAR', __RC__)
+      call MAPL_GetPointer(export, var, 'WM_USTAR', __RC__)
       if (associated(var)) then
          allocate(svar(nseal), __STAT__) 
          call global2local(UST(1:NSEA),svar)
