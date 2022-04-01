@@ -756,42 +756,13 @@
           DIMS           = MAPL_DimsHorzOnly,                      &
           VLOCATION      = MAPL_VLocationNone,     __RC__)
 
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'EDF',                                  &
+          LONG_NAME      = 'wave_energy_dissipation_flux',         &
+          UNITS          = 'kg s-3',                               &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
 
-!     call MAPL_AddExportSpec(GC,                                  &
-!         SHORT_NAME     = 'EDFX',                                 &
-!         LONG_NAME      = 'wave_energy_dissipation_flux_x_component', &
-!         UNITS          = 'kg s-3',                               &
-!         DIMS           = MAPL_DimsHorzOnly,                      &
-!         VLOCATION      = MAPL_VLocationNone,     __RC__)
-    
-!     call MAPL_AddExportSpec(GC,                                  &
-!         SHORT_NAME     = 'EDFY',                                 &
-!         LONG_NAME      = 'wave_energy_dissipation_flux_y_component', &
-!         UNITS          = 'kg s-3',                               &
-!         DIMS           = MAPL_DimsHorzOnly,                      &
-!         VLOCATION      = MAPL_VLocationNone,     __RC__)
-    
-!     call MAPL_AddExportSpec(GC,                                  &
-!         SHORT_NAME     = 'EDF',                                  &
-!         LONG_NAME      = 'wave_energy_dissipation_flux',         &
-!         UNITS          = 'kg s-3',                               &
-!         DIMS           = MAPL_DimsHorzOnly,                      &
-!         VLOCATION      = MAPL_VLocationNone,     __RC__)
-
-!     call MAPL_AddExportSpec(GC,                                  &
-!         SHORT_NAME     = 'EGFX',                                 &
-!         LONG_NAME      = 'wave_energy_growth_flux_x_component',  &
-!         UNITS          = 'kg s-3',                               &
-!         DIMS           = MAPL_DimsHorzOnly,                      &
-!         VLOCATION      = MAPL_VLocationNone,     __RC__)
-    
-!     call MAPL_AddExportSpec(GC,                                  &
-!         SHORT_NAME     = 'EGFY',                                 &
-!         LONG_NAME      = 'wave_energy_growth_flux_y_component',  &
-!         UNITS          = 'kg s-3',                               &
-!         DIMS           = MAPL_DimsHorzOnly,                      &
-!         VLOCATION      = MAPL_VLocationNone,     __RC__)
-    
 !     call MAPL_AddExportSpec(GC,                                  &
 !         SHORT_NAME     = 'EGF',                                  &
 !         LONG_NAME      = 'wave_energy_growth_flux',              &
@@ -800,7 +771,7 @@
 !         VLOCATION      = MAPL_VLocationNone,     __RC__)
 
       call MAPL_AddExportSpec(GC,                                  &
-          SHORT_NAME     = 'WM_USTAR',                             &
+          SHORT_NAME     = 'USTAR',                                &
           LONG_NAME      = 'friction_velosity',                    &
           UNITS          = 'm s-1',                                &
           DIMS           = MAPL_DimsHorzOnly,                      &
@@ -2208,7 +2179,7 @@
 ! -------------------------------------------------------------------- /
 ! Charnock
 !
-      call MAPL_GetPointer(export, var, 'CHARNOCK', __RC__)
+      call MAPL_GetPointer(export, var, 'CHARNOCK', alloc=.true., __RC__)
       if (associated(var)) then
          allocate(svar(nseal), __STAT__)
          call CalcCharnk( svar, __RC__ )
@@ -2230,7 +2201,7 @@
 ! -------------------------------------------------------------------- /
 ! Friction velocity
 !
-      call MAPL_GetPointer(export, var, 'WM_USTAR', __RC__)
+      call MAPL_GetPointer(export, var, 'USTAR', alloc=.true., __RC__)
       if (associated(var)) then
          allocate(svar(nseal), __STAT__) 
          call global2local(UST(1:NSEA),svar)
@@ -2278,7 +2249,7 @@
 ! -------------------------------------------------------------------- /
 ! Significant Wave Height
 !
-      call MAPL_GetPointer(export, var, 'SWH', __RC__)
+      call MAPL_GetPointer(export, var, 'SWH', alloc=.true., __RC__)
       if (associated(var)) then
          allocate(svar(nseal), __STAT__) 
          svar = HS
@@ -2626,7 +2597,10 @@
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
       end if
-
+!
+! -------------------------------------------------------------------- /
+! Wave to ocean energy flux 
+!
       call MAPL_GetPointer(export, var, 'FOC', __RC__)
       if (associated(var)) then
          allocate(svar(nseal), __STAT__) 
@@ -2634,6 +2608,20 @@
          where(svar == UNDEF) svar = MAPL_Undef
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
+      end if
+!
+! -------------------------------------------------------------------- /
+! Wave energy dissipation flux: for symmetry with UMWM, EDF = FOC 
+!
+      call MAPL_GetPointer(export, var, 'EDF', alloc=.true., __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__) 
+         svar = PHIOC
+         where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+
+         ! [FOC] = W m-2 = [EDF] = kg s-3
       end if
 !
 ! -------------------------------------------------------------------- /
