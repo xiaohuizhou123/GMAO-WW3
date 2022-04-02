@@ -772,21 +772,21 @@
 
       call MAPL_AddExportSpec(GC,                                  &
           SHORT_NAME     = 'USTAR',                                &
-          LONG_NAME      = 'friction_velosity',                    &
+          LONG_NAME      = 'friction_velocity',                    &
           UNITS          = 'm s-1',                                &
           DIMS           = MAPL_DimsHorzOnly,                      &
           VLOCATION      = MAPL_VLocationNone,     __RC__)
 
       call MAPL_AddExportSpec(GC,                                  &
           SHORT_NAME     = 'UUST',                                 &
-          LONG_NAME      = 'eastward_friction_velosity',           &
+          LONG_NAME      = 'eastward_friction_velocity',           &
           UNITS          = 'm s-1',                                &
           DIMS           = MAPL_DimsHorzOnly,                      &
           VLOCATION      = MAPL_VLocationNone,     __RC__)
 
       call MAPL_AddExportSpec(GC,                                  &
           SHORT_NAME     = 'VUST',                                 &
-          LONG_NAME      = 'northward_friction_velosity',          &
+          LONG_NAME      = 'northward_friction_velocity',          &
           UNITS          = 'm s-1',                                &
           DIMS           = MAPL_DimsHorzOnly,                      &
           VLOCATION      = MAPL_VLocationNone,     __RC__)
