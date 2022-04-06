@@ -665,19 +665,19 @@
           DIMS           = MAPL_DimsHorzOnly,                      &
           VLOCATION      = MAPL_VLocationNone,     __RC__)
 
-!     call MAPL_AddExportSpec(GC,                                  &
-!         SHORT_NAME     = 'DCP0',                                 &
-!         LONG_NAME      = 'dominant_phase_speed_intrinsic',       &
-!         UNITS          = 'm s-1',                                &
-!         DIMS           = MAPL_DimsHorzOnly,                      &
-!         VLOCATION      = MAPL_VLocationNone,     __RC__)
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'DCP0',                                 &
+          LONG_NAME      = 'dominant_phase_speed_intrinsic',       &
+          UNITS          = 'm s-1',                                &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
     
-!     call MAPL_AddExportSpec(GC,                                  &
-!         SHORT_NAME     = 'DCG0',                                 &
-!         LONG_NAME      = 'dominant_group_speed_intrinsic',       &
-!         UNITS          = 'm s-1',                                &
-!         DIMS           = MAPL_DimsHorzOnly,                      &
-!         VLOCATION      = MAPL_VLocationNone,     __RC__)
+      call MAPL_AddExportSpec(GC,                                  &
+          SHORT_NAME     = 'DCG0',                                 &
+          LONG_NAME      = 'dominant_group_speed_intrinsic',       &
+          UNITS          = 'm s-1',                                &
+          DIMS           = MAPL_DimsHorzOnly,                      &
+          VLOCATION      = MAPL_VLocationNone,     __RC__)
     
       call MAPL_AddExportSpec(GC,                                  &
           SHORT_NAME     = 'DCP',                                  &
@@ -2471,6 +2471,42 @@
          allocate(svar(nseal), __STAT__)
          svar = TWS
          where(svar == UNDEF) svar = MAPL_Undef
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+!
+! -------------------------------------------------------------------- /
+! Dominant Phase Speed (intrinsic)
+!
+      call MAPL_GetPointer(export, var, 'DCP0', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__)
+         svar = FP0
+         where(svar == UNDEF) 
+             svar = MAPL_Undef
+         elsewhere
+             ! see Eq. 7 in 'Wind Speed Scaling in Fully Developed Seas', PHOC, 1999 
+             ! phase speed based on the deep water linear dispersion
+             svar = (GRAV / TPI) / svar
+         end where    
+         call sea2grid(svar, var, __RC__)
+         deallocate(svar)
+      end if
+!
+! -------------------------------------------------------------------- /
+! Dominant Phase Speed: for now same as DCP0
+!
+      call MAPL_GetPointer(export, var, 'DCP', __RC__)
+      if (associated(var)) then
+         allocate(svar(nseal), __STAT__)
+         svar = FP0
+         where(svar == UNDEF)
+             svar = MAPL_Undef
+         elsewhere
+             ! see Eq. 7 in 'Wind Speed Scaling in Fully Developed Seas', PHOC, 1999 
+             ! phase speed based on the deep water linear dispersion
+             svar = (GRAV / TPI) / svar
+         end where    
          call sea2grid(svar, var, __RC__)
          deallocate(svar)
       end if
