@@ -144,7 +144,10 @@
       use WMWAVEMD, only: WMWAVE
       use WMFINLMD, only: WMFINL
       use WMMDATMD
-      use W3GDATMD
+      ! We rename the derived type GRID from W3GDATMD to W3GRID to avoid
+      ! a name clash with an ESMF_Grid called "grid" declared below.
+      ! This was detected by GNU
+      use W3GDATMD, W3GRID => GRID
       use W3IDATMD
       use W3ODATMD
       use W3WDATMD
