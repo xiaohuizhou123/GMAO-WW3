@@ -3899,13 +3899,46 @@
 ! Allocate and fill node coordinate array.
 ! Since this is a 2D Mesh the size is 2x the
 ! number of nodes.
-         allocate(nodeCoords(2*NX))
-         do i = 1,NX
-            do j = 1,2
-               pos=2*(i-1)+j
-               nodeCoords(pos)=XYB(i,j)
-            enddo
-         enddo
+#ifdef W3_PDLIB
+    if ( LPDLIB .EQV. .FALSE. ) then
+#endif
+      allocate(nodeCoords(2*NX))
+      do i = 1,NX
+        do j = 1,2
+          pos=2*(i-1)+j
+          if (j == 1) then
+            nodeCoords(pos) = xgrd(1,i)
+          else
+            nodeCoords(pos) = ygrd(1,i)
+          endif
+        enddo
+      enddo
+#ifdef W3_PDLIB
+    else
+      !        -------------------------------------------------------------------
+      !        ESMF Definition: Physical coordinates of the nodes
+      !        -------------------------------------------------------------------
+      allocate(nodeCoords(2*npa))
+      do i = 1,npa
+        do j = 1,2
+          pos=2*(i-1)+j
+          if ( j == 1) then
+            nodeCoords(pos) = xgrd(1,iplg(i))
+          else
+            nodeCoords(pos) = ygrd(1,iplg(i))
+          endif
+        enddo
+      enddo
+    endif
+    !
+    !      call ESMF_LogWrite(trim(cname)//': In CreateImpMesh, nodeCoords=', &
+    !          ESMF_LOGMSG_INFO)
+    !      do i = 1,(2*npa)
+    !        write(msg,*) trim(cname)//': nodeCoords(i)',i, &
+    !          ' ',nodeCoords(i)
+    !        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+    !      enddo
+#endif
  
 !      call ESMF_LogWrite(trim(cname)//': In CreateImpMesh, nodeCoords=', &
 !          ESMF_LOGMSG_INFO)
@@ -4130,139 +4163,293 @@
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       natStaggerLoc = ESMF_STAGGERLOC_CENTER
       natIndexFlag = ESMF_INDEX_DELOCAL
-!
-! -------------------------------------------------------------------- /
-! 2.  Create ESMF mesh for export
-!
-! 2.a Create ESMF export mesh
-!
-! Allocate and fill the node id array.
-         allocate(nodeIds(NX))
-         do i = 1,NX
-            nodeIds(i)=i
-         enddo
- 
-!      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, nodeIds=', &
-!          ESMF_LOGMSG_INFO)
-!      do i = 1,NX
-!        write(msg,*) trim(cname)//': ',i, &
-!          ' ',nodeIds(i)
-!        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-!      enddo
- 
-! Allocate and fill node coordinate array.
-! Since this is a 2D Mesh the size is 2x the
-! number of nodes.
-         allocate(nodeCoords(2*NX))
-         do i = 1,NX
-            do j = 1,2
-               pos=2*(i-1)+j
-               nodeCoords(pos)=XYB(i,j)
-            enddo
-         enddo
- 
-!      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, nodeCoords=', &
-!          ESMF_LOGMSG_INFO)
-!      do i = 1,(2*NX)
-!        write(msg,*) trim(cname)//': ',i, &
-!          ' ',nodeCoords(i)
-!        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-!      enddo
- 
-! Allocate and fill the node owner array.
-         allocate(nodeOwners(NX))
-         nodeOwners=0 ! TODO: For now, export everything via PET 0
- 
-!      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, nodeOwners=', &
-!          ESMF_LOGMSG_INFO)
-!      do i = 1,NX
-!        write(msg,*) trim(cname)//': ',i, &
-!          ' ',nodeOwners(i)
-!        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-!      enddo
- 
-! Allocate and fill the element id array.
-         allocate(elemIds(NTRI))
-         do i = 1,NTRI
-            elemIds(i)=i
-         enddo
- 
-!      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, elemIds=', &
-!          ESMF_LOGMSG_INFO)
-!      do i = 1,NTRI
-!        write(msg,*) trim(cname)//': ',i, &
-!          ' ',elemIds(i)
-!        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-!      enddo
- 
-! Allocate and fill the element topology type array.
-         allocate(elemTypes(NTRI))
-         do i = 1,NTRI
-            elemTypes(i)=ESMF_MESHELEMTYPE_TRI
-         enddo
- 
-!      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, elemTypes=', &
-!          ESMF_LOGMSG_INFO)
-!      do i = 1,NTRI
-!        write(msg,*) trim(cname)//': ',i, &
-!          ' ',elemTypes(i)
-!        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-!      enddo
- 
-! Allocate and fill the element connection type array.
-         allocate(elemConn(3*NTRI))
-         do i = 1,NTRI
-            do j = 1,3
-               pos=3*(i-1)+j
-               elemConn(pos)=TRIGP(i,j)
-            enddo
-         enddo
- 
-!      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, elemConn=', &
-!          ESMF_LOGMSG_INFO)
-!      do i = 1,(3*NTRI)
-!        write(msg,*) trim(cname)//': ',i, &
-!          ' ',elemConn(i)
-!        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
-!      enddo
- 
-      expMesh = ESMF_MeshCreate( parametricDim=2,spatialDim=2, &
+    !
+    ! -------------------------------------------------------------------- /
+    ! 2.  Create ESMF mesh for export
+    !
+    ! 2.a Create ESMF export mesh
+    !
+    ! Allocate and fill the node id array.
+#ifdef W3_PDLIB
+    if ( LPDLIB .EQV. .FALSE. ) then
+#endif
+      allocate(nodeIds(NX))
+      do i = 1,NX
+        nodeIds(i)=i
+      enddo
+#ifdef W3_PDLIB
+    else
+      !        -------------------------------------------------------------------
+      !        ESMF Definition: The global id's of the nodes resident on this processor
+      !        -------------------------------------------------------------------
+      !        Allocate global node ids, including ghost nodes (npa=np+ng)
+      allocate(nodeIds(npa))
+      do i = 1,npa
+        nodeIds(i)=iplg(i)
+      enddo
+    endif
+    !
+    !      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, nodeIds=', &
+    !          ESMF_LOGMSG_INFO)
+    !         do i = 1,npa
+    !         write(msg,*) trim(cname)//': nodeIds(i)',i, &
+    !          ' ',nodeIds(i)
+    !        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+    !      enddo
+#endif
+
+    !      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, nodeIds=', &
+    !          ESMF_LOGMSG_INFO)
+    !      do i = 1,NX
+    !        write(msg,*) trim(cname)//': ',i, &
+    !          ' ',nodeIds(i)
+    !        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+    !      enddo
+
+    ! Allocate and fill node coordinate array.
+    ! Since this is a 2D Mesh the size is 2x the
+    ! number of nodes.
+#ifdef W3_PDLIB
+    if ( LPDLIB .EQV. .FALSE. ) then
+#endif
+      allocate(nodeCoords(2*NX))
+      do i = 1,NX
+        do j = 1,2
+          pos=2*(i-1)+j
+          if (j == 1) then
+            nodeCoords(pos) = xgrd(1,i)
+          else
+            nodeCoords(pos) = ygrd(1,i)
+          endif
+        enddo
+      enddo
+#ifdef W3_PDLIB
+    else
+      !        -------------------------------------------------------------------
+      !        ESMF Definition: Physical coordinates of the nodes
+      !        -------------------------------------------------------------------
+      allocate(nodeCoords(2*npa))
+      do i = 1,npa
+        do j = 1,2
+          pos=2*(i-1)+j
+          if ( j == 1) then
+            nodeCoords(pos) = xgrd(1,iplg(i))
+          else
+            nodeCoords(pos) = ygrd(1,iplg(i))
+          endif
+        enddo
+      enddo
+    endif
+    !
+    !      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, nodeCoords=', &
+    !          ESMF_LOGMSG_INFO)
+    !      do i = 1,(2*npa)
+    !        write(msg,*) trim(cname)//': nodeCoords(i)',i, &
+    !          ' ',nodeCoords(i)
+    !        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+    !      enddo
+#endif
+
+    !      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, nodeCoords=', &
+    !          ESMF_LOGMSG_INFO)
+    !      do i = 1,(2*NX)
+    !        write(msg,*) trim(cname)//': ',i, &
+    !          ' ',nodeCoords(i)
+    !        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+    !      enddo
+
+    ! Allocate and fill the node owner array.
+#ifdef W3_PDLIB
+    if ( LPDLIB .EQV. .FALSE. ) then
+#endif
+      allocate(nodeOwners(NX))
+      nodeOwners=0 ! TODO: For now, export everything via PET 0
+#ifdef W3_PDLIB
+    else
+      !        -------------------------------------------------------------------
+      !        ESMF Definition: Processor that owns the node
+      !        -------------------------------------------------------------------
+      allocate(nodeOwners(npa))
+      nodeOwners=nodes_global(iplg(1:npa))%domainID-1
+    endif
+    !
+    !      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, nodeOwners=', &
+    !          ESMF_LOGMSG_INFO)
+    !      do i = 1,npa
+    !        write(msg,*) trim(cname)//': nodeOwners(i)',i, &
+    !          ' ',nodeOwners(i)
+    !        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+    !      enddo
+#endif
+
+    !      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, nodeOwners=', &
+    !          ESMF_LOGMSG_INFO)
+    !      do i = 1,NX
+    !        write(msg,*) trim(cname)//': ',i, &
+    !          ' ',nodeOwners(i)
+    !        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+    !      enddo
+
+    ! Allocate and fill the element id array.
+#ifdef W3_PDLIB
+    if ( LPDLIB .EQV. .FALSE. ) then
+#endif
+      allocate(elemIds(NTRI))
+      do i = 1,NTRI
+        elemIds(i)=i
+      enddo
+#ifdef W3_PDLIB
+    else
+      !        -------------------------------------------------------------------
+      !        ESMF Definition: The global id's of the elements resident on this processor
+      !        -------------------------------------------------------------------
+      allocate(elemIds(ne))
+      do i = 1,ne
+        elemIds(i)=ielg(i)
+      enddo
+    endif
+    !
+    !      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, elemIds=', &
+    !          ESMF_LOGMSG_INFO)
+    !      do i = 1,ne
+    !        write(msg,*) trim(cname)//': elemIds(i)',i, &
+    !          ' ',elemIds(i)
+    !        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+    !      enddo
+#endif
+
+    !      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, elemIds=', &
+    !          ESMF_LOGMSG_INFO)
+    !      do i = 1,NTRI
+    !        write(msg,*) trim(cname)//': ',i, &
+    !          ' ',elemIds(i)
+    !        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+    !      enddo
+
+    ! Allocate and fill the element topology type array.
+#ifdef W3_PDLIB
+    if ( LPDLIB .EQV. .FALSE. ) then
+#endif
+      allocate(elemTypes(NTRI))
+      do i = 1,NTRI
+        elemTypes(i)=ESMF_MESHELEMTYPE_TRI
+      enddo
+#ifdef W3_PDLIB
+    else
+      !        -------------------------------------------------------------------
+      !        ESMF Definition: Topology of the given element (one of ESMF_MeshElement)
+      !        -------------------------------------------------------------------
+      allocate(elemTypes(ne))
+      do i = 1,ne
+        elemTypes(i)=ESMF_MESHELEMTYPE_TRI
+      enddo
+    endif
+    !
+    !      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, elemTypes=', &
+    !          ESMF_LOGMSG_INFO)
+    !      do i = 1,ne
+    !        write(msg,*) trim(cname)//': elemTypes(i)',i, &
+    !          ' ',elemTypes(i)
+    !        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+    !      enddo
+#endif
+
+    !      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, elemTypes=', &
+    !          ESMF_LOGMSG_INFO)
+    !      do i = 1,NTRI
+    !        write(msg,*) trim(cname)//': ',i, &
+    !          ' ',elemTypes(i)
+    !        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+    !      enddo
+
+    ! Allocate and fill the element connection type array.
+#ifdef W3_PDLIB
+    if ( LPDLIB .EQV. .FALSE. ) then
+#endif
+      allocate(elemConn(3*NTRI))
+      do i = 1,NTRI
+        do j = 1,3
+          pos=3*(i-1)+j
+          elemConn(pos)=TRIGP(j,i)
+        enddo
+      enddo
+#ifdef W3_PDLIB
+    else
+      !        -------------------------------------------------------------------
+      !        ESMF Definition: Connectivity table. The number of entries should
+      !        be equal to the number of nodes in the given topology. The indices
+      !        should be the local index (1 based) into the array of nodes that
+      !        was declared with MeshAddNodes.
+      !        -------------------------------------------------------------------
+      !        > INE is local element array. it stores the local node IDs
+      !        > first index from 1 to 3.
+      !        > second index from 1 to ne.
+      allocate(elemConn(3*ne))
+      do i = 1,ne
+        do j = 1,3
+          pos=3*(i-1)+j
+          elemConn(pos)=INE(j,i)
+        enddo
+      enddo
+    endif
+    !
+    !      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, elemConn=', &
+    !          ESMF_LOGMSG_INFO)
+    !      do i = 1,(3*ne)
+    !        write(msg,*) trim(cname)//': elemConn(i)',i, &
+    !          ' ',elemConn(i)
+    !        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+    !      enddo
+#endif
+
+    !      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, elemConn=', &
+    !          ESMF_LOGMSG_INFO)
+    !      do i = 1,(3*NTRI)
+    !        write(msg,*) trim(cname)//': ',i, &
+    !          ' ',elemConn(i)
+    !        call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
+    !      enddo
+
+    expMesh = ESMF_MeshCreate( parametricDim=2,spatialDim=2, &
          nodeIds=nodeIds, nodeCoords=nodeCoords, &
          nodeOwners=nodeOwners, elementIds=elemIds,&
          elementTypes=elemTypes, elementConn=elemConn, &
          rc=rc )
-      if (ESMF_LogFoundError(rc, PASSTHRU)) return
- 
-      deallocate(nodeIds)
-      deallocate(nodeCoords)
-      deallocate(nodeOwners)
-      deallocate(elemIds)
-      deallocate(elemTypes)
-      deallocate(elemConn)
-!
-!     Set flag to indicate that this processor has local export grid storage
-!
-!AW      if (lpet == 0) then
-!AW         call ESMF_GridGet( expMesh, localDECount=ldecnt, rc=rc )
-!AW         if (ESMF_LogFoundError(rc, PASSTHRU)) return
-!AW         expGridIsLocal = ldecnt.gt.0
-!AW      endif
- 
-!
-! -------------------------------------------------------------------- /
-! 3.  Create ESMF grid with arbitrary domain decomposition to match
-!     the native domain decomposition of the non-excluded points
-!     Note that the native grid layout is dim1=Y, dim2=X
-!     Note that coordinates and mask are not needed since this
-!     grid is only used to define fields for a redist operation
-!
-! 3.a Set flag to indicate that this processor has local native grid storage
-!
-      natGridIsLocal = iaproc .gt. 0 .and. iaproc .le. naproc
- 
-!
-! 3.b Setup arbitrary sequence index list
-!
+    if (ESMF_LogFoundError(rc, PASSTHRU)) return
+
+    deallocate(nodeIds)
+    deallocate(nodeCoords)
+    deallocate(nodeOwners)
+    deallocate(elemIds)
+    deallocate(elemTypes)
+    deallocate(elemConn)
+    !
+    !     Set flag to indicate that this processor has local export grid storage
+    !
+    !AW      if (lpet == 0) then
+    !AW         call ESMF_GridGet( expMesh, localDECount=ldecnt, rc=rc )
+    !AW         if (ESMF_LogFoundError(rc, PASSTHRU)) return
+    !AW         expGridIsLocal = ldecnt.gt.0
+    !AW      endif
+
+    !
+    ! -------------------------------------------------------------------- /
+    ! 3.  Create ESMF grid with arbitrary domain decomposition to match
+    !     the native domain decomposition of the non-excluded points
+    !     Note that the native grid layout is dim1=Y, dim2=X
+    !     Note that coordinates and mask are not needed since this
+    !     grid is only used to define fields for a redist operation
+    !
+    ! 3.a Set flag to indicate that this processor has local native grid storage
+    !
+    natGridIsLocal = iaproc .gt. 0 .and. iaproc .le. naproc
+
+#ifdef W3_PDLIB
+    if ( LPDLIB .EQV. .FALSE. ) then
+#endif
+      !
+      ! 3.b Setup arbitrary sequence index list
+      !
       do ipass = 1,2
         if (ipass.eq.2) then
           allocate (arbIndexList(arbIndexCount,2), stat=rc)
@@ -4272,7 +4459,12 @@
         ! list local native grid non-excluded points
         if ( natGridIsLocal ) then
           do jsea = 1,nseal
+#ifdef W3_DIST
             isea = iaproc + (jsea-1)*naproc
+#endif
+#ifdef W3_SHRD
+            isea = jsea
+#endif
             arbIndexCount = arbIndexCount+1
             if (ipass.eq.2) then
               ix = mapsf(isea,1)
@@ -4284,62 +4476,66 @@
           enddo
         endif
       enddo !ipass
-!
-! 3.c Create ESMF native grid
-!
+      !
+      ! 3.c Create ESMF native grid
+      !
       natGrid = ESMF_GridCreateNoPeriDim( &
-        minIndex=(/ 1, 1/), &
-        maxIndex=(/ny,nx/), &
-        coordDep1=(/ESMF_DIM_ARB,ESMF_DIM_ARB/), &
-        coordDep2=(/ESMF_DIM_ARB,ESMF_DIM_ARB/), &
-        arbIndexCount=arbIndexCount, &
-        arbIndexList=arbIndexList, &
-        coordTypeKind=ESMF_TYPEKIND_RX, &
-        coordSys=ESMF_COORDSYS_SPH_DEG, &
-        name=trim(cname)//"_native_grid", rc=rc )
+           minIndex=(/ 1, 1/), &
+           maxIndex=(/ny,nx/), &
+           coordDep1=(/ESMF_DIM_ARB,ESMF_DIM_ARB/), &
+           coordDep2=(/ESMF_DIM_ARB,ESMF_DIM_ARB/), &
+           arbIndexCount=arbIndexCount, &
+           arbIndexList=arbIndexList, &
+           coordTypeKind=ESMF_TYPEKIND_RX, &
+           coordSys=ESMF_COORDSYS_SPH_DEG, &
+           name=trim(cname)//"_native_grid", rc=rc )
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
-!
-! 3.d Deallocate arbitrary sequence index list
-!
+      !
+      ! 3.d Deallocate arbitrary sequence index list
+      !
       deallocate (arbIndexList, stat=rc)
       if (ESMF_LogFoundDeallocError(rc, PASSTHRU)) return
-!
-! -------------------------------------------------------------------- /
-! 4.  Create route handle for redist between native grid domain
-!     decomposition and the export grid domain decomposition
-!
-! 4.a Create temporary fields
-!
+      !
+      ! -------------------------------------------------------------------- /
+      ! 4.  Create route handle for redist between native grid domain
+      !     decomposition and the export grid domain decomposition
+      !
+      ! 4.a Create temporary fields
+      !
       nField = ESMF_FieldCreate( natGrid, natArraySpec1D, &
-        staggerLoc=natStaggerLoc, rc=rc )
+           staggerLoc=natStaggerLoc, rc=rc )
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       eField = ESMF_FieldCreate(expMesh, typekind=ESMF_TYPEKIND_RX, rc=rc)
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
-!
-! 4.b Store route handle
-!
+      !
+      ! 4.b Store route handle
+      !
       call ESMF_FieldRedistStore( nField, eField, n2eRH, rc=rc )
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
-!
-! 4.c Clean up
-!
+      !
+      ! 4.c Clean up
+      !
       call ESMF_FieldDestroy( nField, rc=rc )
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
       call ESMF_FieldDestroy( eField, rc=rc )
       if (ESMF_LogFoundError(rc, PASSTHRU)) return
- 
- 
-      call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, created expMesh', &
-          ESMF_LOGMSG_INFO)
- 
-      rc = ESMF_SUCCESS
-      if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
-        ': leaving CreateExpMesh', ESMF_LOGMSG_INFO)
-!/
-!/ End of CreateExpMesh ---------------------------------------------- /
-!/
-      end subroutine CreateExpMesh
-!/ ------------------------------------------------------------------- /
+
+#ifdef W3_PDLIB
+    endif
+#endif
+
+    call ESMF_LogWrite(trim(cname)//': In CreateExpMesh, created expMesh', &
+         ESMF_LOGMSG_INFO)
+
+    rc = ESMF_SUCCESS
+    if (verbosity.gt.0) call ESMF_LogWrite(trim(cname)// &
+         ': leaving CreateExpMesh', ESMF_LOGMSG_INFO)
+    !/
+    !/ End of CreateExpMesh ---------------------------------------------- /
+    !/
+  end subroutine CreateExpMesh
+  !/ ------------------------------------------------------------------- /
+  !/
 #undef METHOD
 #define METHOD "SetupImpBmsk"
       subroutine SetupImpBmsk( bmskField, impField, missingVal, rc )
@@ -5326,7 +5522,7 @@
       logical, save :: firstCall = .true.
       integer :: isea, jsea
       real    :: emean, fmean, fmean1, wnmean, amax, ustar, ustdr, &
-                 tauwx, tauwy, cd, z0, fmeanws
+                 tauwx, tauwy, cd, z0, fmeanws, dlwmean
       logical :: llws(nspec)
 !ALT      type(ESMF_Field) :: chknField
       real(ESMF_KIND_RX), pointer :: chkn(:)
@@ -5350,7 +5546,8 @@
             call w3spr4( va(:,jsea), cg(1:nk,isea), wn(1:nk,isea),   &
                          emean, fmean, fmean1, wnmean, amax,         &
                          u10(isea), u10d(isea), ustar, ustdr, tauwx, &
-                         tauwy, cd, z0, charn(jsea), llws, fmeanws )
+                         tauwy, cd, z0, charn(jsea), llws, fmeanws,  &
+                         dlwmean  )
           endif !firstCall
 !	  ix = mapsf(isea,1)
 !	  jx = mapsf(isea,2)
@@ -5435,7 +5632,7 @@
       logical, save :: firstCall = .true.
       integer :: isea, jsea
       real    :: emean, fmean, fmean1, wnmean, amax, ustar, ustdr, &
-                 tauwx, tauwy, cd, z0, fmeanws
+                 tauwx, tauwy, cd, z0, fmeanws, dlwmean
       logical :: llws(nspec)
 !
 ! -------------------------------------------------------------------- /
@@ -5452,7 +5649,8 @@
             call w3spr4( va(:,jsea), cg(1:nk,isea), wn(1:nk,isea),   &
                          emean, fmean, fmean1, wnmean, amax,         &
                          u10(isea), u10d(isea), ustar, ustdr, tauwx, &
-                         tauwy, cd, z0, charn(jsea), llws, fmeanws )
+                         tauwy, cd, z0, charn(jsea), llws, fmeanws,  &
+                         dlwmean)
           endif !firstCall
           if (ust(isea) == UNDEF .or. charn(jsea) == UNDEF) then
              wrln(jsea) = MAPL_Undef
@@ -6170,7 +6368,7 @@
                   ! to avoid some unnecessary bookkeeping and to
                   ! to make sure that every PE gets the same unit
  
-        CALL W3IORS ('HOT', unit, dummy, ITEST, IMOD )
+! TODO WIP        CALL W3IORS ('HOT', unit, dummy, ITEST, IMOD )
  
         ! this is needed to write IMPORT checkpoint and proper timers reporting
 	call MAPL_GenericRecord( gc, import, export, clock, __RC__ )
@@ -6206,7 +6404,7 @@
                   ! to avoid some unnecessary bookkeeping and to
                   ! to make sure that every PE gets the same unit
  
-        CALL W3IORS ('HOT', unit, dummy, ITEST, IMOD )
+! TODO WIP        CALL W3IORS ('HOT', unit, dummy, ITEST, IMOD )
  
 !       Finalize the wave model
 !
