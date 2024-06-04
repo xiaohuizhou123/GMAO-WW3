@@ -6352,8 +6352,7 @@
 	integer :: status
         character(len=ESMF_MAXSTR)      :: Iam
         integer :: unit
-        integer :: itest ! this is intent(out) argument to W3IORS
-        integer, parameter :: imod=1 ! grid id for the M3IORS (defaults to 1 if not supplied)
+        integer, parameter :: imod=1  ! grid id for the M3IORS (defaults to 1 if not supplied)
         character(len=ESMF_MAXSTR)      :: COMP_NAME
  
         real :: dummy
@@ -6368,7 +6367,7 @@
                   ! to avoid some unnecessary bookkeeping and to
                   ! to make sure that every PE gets the same unit
  
-! TODO WIP        CALL W3IORS ('HOT', unit, dummy, ITEST, IMOD )
+        CALL W3IORS ('HOT', unit, dummy, IMOD )
  
         ! this is needed to write IMPORT checkpoint and proper timers reporting
 	call MAPL_GenericRecord( gc, import, export, clock, __RC__ )
