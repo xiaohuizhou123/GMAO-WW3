@@ -5803,7 +5803,7 @@ module WMESMFMD
 !/ ------------------------------------------------------------------- /
 #undef METHOD
 #define METHOD "CalcCharnk"
-      subroutine CalcCharnk ( chk, rc )
+      subroutine CalcCharnk ( chkn, rc )
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -5847,12 +5847,19 @@ module WMESMFMD
 !
 ! 10. Source code :
 !
+
+
+
+
+
+
+
 !/ ------------------------------------------------------------------- /
 !/
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      real :: chk(:)
+      real(ESMF_KIND_RX) :: chkn(:)
       integer          :: rc
 !/
 !/ ------------------------------------------------------------------- /
@@ -5865,7 +5872,6 @@ module WMESMFMD
                  tauwx, tauwy, cd, z0, fmeanws, dlwmean
       logical :: llws(nspec)
 !ALT      type(ESMF_Field) :: chknField
-      real(ESMF_KIND_RX), pointer :: chkn(:)
 !ALT      integer, save :: timeSlice = 1
       integer :: status
       integer :: ix, jx
