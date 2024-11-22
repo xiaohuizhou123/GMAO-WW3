@@ -1849,6 +1849,8 @@ CONTAINS
     !/    14-Aug-2006 : Modified following Bidlot           ( version 2.22-SHOM )
     !/    18-Aug-2006 : Ported to version 3.09
     !/    03-Apr-2010 : Adding output of Charnock parameter ( version 3.14-IFREMER )
+    !/    03-May-2024 : Optional functional form of         ( version 7.15 )
+    !/                  Charnock coefficient and surface drag (UK Met Office).
     !
     !  1. Purpose :
     !
@@ -1895,7 +1897,7 @@ CONTAINS
     ! 10. Source code :
     !-----------------------------------------------------------------------------!
     USE CONSTANTS, ONLY: GRAV, KAPPA, NU_AIR
-    USE W3GDATMD,  ONLY: ZZWND, AALPHA, ZZ0MAX, SINTAILPAR
+    USE W3GDATMD,  ONLY: ZZWND, AALPHA, ZZ0MAX, SINTAILPAR, CAPCHNK
 #ifdef W3_T
     USE W3ODATMD, ONLY: NDST
 #endif
@@ -1908,6 +1910,7 @@ CONTAINS
     INTEGER          :: IND,J
     REAL             :: TAUW_LOCAL
     REAL             :: TAUOLD,CDRAG,WCD,USTOLD,X,UST,ZZ0,ZNU,ZZ00,F,DELF
+    REAL             :: CHATH, XMIN ! used for reduction of high winds
     INTEGER, PARAMETER      :: NITER=10
     REAL   , PARAMETER      :: XM=0.50, EPS1=0.00001
     INTEGER                 :: ITER
@@ -1918,6 +1921,7 @@ CONTAINS
     !      *EPS1*      REAL      SMALL NUMBER TO MAKE SURE THAT A SOLUTION
     !                            IS OBTAINED IN ITERATION WITH TAU>TAUW.
 
+    CHATH = AALPHA
     !
     IF (SINTAILPAR(1).GT.0.5) THEN
       TAUW_LOCAL=MAX(MIN(TAUW,TAUWMAX),0.)
@@ -1932,6 +1936,17 @@ CONTAINS
       USTAR=(TAUT(IND,J)*DELI2+TAUT(IND+1,J  )*DELI1)*DELJ2 &
            + (TAUT(IND,J+1)*DELI2+TAUT(IND+1,J+1)*DELI1)*DELJ1
     ELSE
+      IF (CAPCHNK(1).EQ.1.) THEN
+        ! Computation of sea surface roughness and charnock coefficient based
+        ! on Donelan (2018). Determines minimum charnock; reduction for winds
+        ! above a particular threshold
+        CHATH  = CAPCHNK(2) + 0.5 * (CAPCHNK(3) - CAPCHNK(2)) * (1 & 
+                 - TANH((WINDSPEED-CAPCHNK(4))/CAPCHNK(5)))
+        XMIN   = 0.15 * (CAPCHNK(3)-CHATH)
+      ELSE
+        XMIN  = 0.
+      END IF
+
       ! This max is for comparison ... to be removed later
       !        TAUW_LOCAL=MAX(MIN(TAUW,TAUWMAX),0.)
       TAUW_LOCAL=TAUW
@@ -1941,9 +1956,9 @@ CONTAINS
       TAUOLD  = MAX(USTOLD**2, TAUW_LOCAL+EPS1)
       ! Newton method to solve for ustar in U=ustar*log(Z/Z0)
       DO ITER=1,NITER
-        X   = TAUW_LOCAL/TAUOLD
+        X   = MAX(TAUW_LOCAL/TAUOLD, XMIN)
         UST = SQRT(TAUOLD)
-        ZZ00=AALPHA*TAUOLD/GRAV
+        ZZ00 = CHATH*TAUOLD/GRAV
         IF (ZZ0MAX.NE.0) ZZ00=MIN(ZZ00,ZZ0MAX)
         ! Corrects roughness ZZ00 for quasi-linear effect
         ZZ0 = ZZ00/(1.-X)**XM
@@ -1969,10 +1984,16 @@ CONTAINS
         SQRTCDM1  = MIN(WINDSPEED/USTAR,100.0)
         Z0  = ZZWND*EXP(-KAPPA*SQRTCDM1)
       ELSE
-        Z0 = AALPHA*0.001*0.001/GRAV
+        Z0 = CHATH*0.001*0.001/GRAV
       END IF
-      CHARN = AALPHA
+      CHARN = CHATH
     END IF
+    IF(CAPCHNK(1) .EQ. 1) THEN
+      ! Problem with large values of CHARN for low winds
+      CHARN = MIN( 0.09 , CHARN )
+      IF(CHARN.LT.CHATH) CHARN = CHATH
+    ENDIF
+
     !  WRITE(6,*) 'CALC_USTAR:',WINDSPEED,TAUW,AALPHA,CHARN,Z0,USTAR
     !
     RETURN
@@ -2208,19 +2229,17 @@ CONTAINS
         DO ITH=1,NTH
           IS=ITH+(IK-1)*NTH
           MSSLONG  = K(IK)**SSDSC(20) * A(IS) * DDEN(IK) / CG(IK) ! contribution to MSS
-          MSSPC2 = MSSPC2 +MSSLONG*EC2(ITH)
-          MSSPS2 = MSSPS2 +MSSLONG*ES2(ITH)
-          MSSPCS = MSSPCS +MSSLONG*ESC(ITH)
+          MSSPC2 = MSSPC2 +MSSLONG*ECOS(ITH)
+          MSSPS2 = MSSPS2 +MSSLONG*ESIN(ITH)
           MSSP   = MSSP   +MSSLONG
         END DO
         MSSSUM  (IK:NK,1) = MSSSUM (IK:NK,1) +MSSP
         MSSSUM  (IK:NK,3) = MSSSUM (IK:NK,3) +MSSPC2
         MSSSUM  (IK:NK,4) = MSSSUM (IK:NK,4) +MSSPS2
-        MSSSUM  (IK:NK,5) = MSSSUM (IK:NK,5) +MSSPCS
         !
         ! Direction of long wave mss summed up to IK
         !
-        MSSD=0.5*(ATAN2(2*MSSSUM(IK,5),MSSSUM(IK,3)-MSSSUM(IK,4)))
+        MSSD=ATAN2(MSSSUM(IK,4),MSSSUM(IK,3))
         IF (MSSD.LT.0) MSSD = MSSD + PI
         MSSSUM  (IK,2)  =  MSSD
       END DO
@@ -2455,7 +2474,7 @@ CONTAINS
       !
       ! directional saturation I
       ! integrate in azimuth
-      KO=(GRAV/(1E-6+USTAR**2))/(28./SSDSC(16))**2
+      KO=(GRAV/(USTAR**2))/(28./SSDSC(16))**2
       DO IK=1,NK
         IS0=(IK-1)*NTH
         KLOC=K(IK)**(2-SSDSC(20)) ! local wavenumber factor, if mss not used.
@@ -2482,12 +2501,12 @@ CONTAINS
              /(SSDSC(13)+1)*LMODULATION(1:NTH)
         ! Breaking strength : generalisation of Duncan's b parameter
         BTOVER = SQRT(BTH0(IK))-SQRT(SSDSBT)
-        BRM12(IK)=SSDSC(2)*(MAX(0.,BTOVER))**(2.5)/SIG(IK)  ! not function of direction
-        !  For consistency set BRLAMBDA set to zero if b is zero
+        BRM12(IK)=SSDSC(2)*(MAX(0.,BTOVER))**(2.5) ! not function of direction
+!  For consistency set BRLAMBDA set to zero if b is zero
         BRLAMBDA(IS0+1:IS0+NTH)= MAX(0.,SIGN(BRLAMBDA(IS0+1:IS0+NTH),BTOVER))
-        !  Source term / sig2  (action dissipation)
-        SRHS(IS0+1:IS0+NTH)= BRM12(IK)/GRAV**2*BRLAMBDA(IS0+1:IS0+NTH)*C**5
-        ! diagonal
+!  Source term / sig2  (action dissipation)
+        SRHS(IS0+1:IS0+NTH)= BRM12(IK)/GRAV**2*BRLAMBDA(IS0+1:IS0+NTH)*C**5/SIG(IK)
+! diagonal
         DDIAG(IS0+1:IS0+NTH) = SRHS(IS0+1:IS0+NTH)*SSDSBR/MAX(1.e-20,BTH(1:NTH))/MAX(1e-20,A(IS0+1:IS0+NTH))  !
       END DO
       !   Breaking probability (Is actually the breaking rate)
@@ -2561,21 +2580,22 @@ CONTAINS
     !
     ! precomputes integration of Lambda over direction
     ! times wavelength times a (a=5 in Reul&Chapron JGR 2003) times dk
-    !
+    ! Romero 2019 - whitecap coverate (COEF4), and air entrainment rate Va (output as wcm) (COEF5) 
     DO IK=1,MIN(FLOOR(AAIRCMIN),NK)
       C=SIG(IK)/K(IK)
       IS0=(IK-1)*NTH
       COEF4(IK) = C*C*SUM(BRLAMBDA(IS0+1:IS0+NTH))                          &
            *2.*PI/GRAV*SSDSC(7) * DDEN(IK)/(SIG(IK)*CG(IK))
+! BRM12 for dissipation needs to be reformulated ( and positive) to the power of 3/2 (Deike et. al 2017; GRL)
       COEF5(IK) = C**3*SUM(BRLAMBDA(IS0+1:IS0+NTH)                           &
-           *BRM12(IK))                       	       &
+           *(-1.*SSDSC(2))*(BRM12(IK)/SSDSC(2))**(3./5.))                               &
            *AAIRGB/GRAV * DDEN(IK)/(SIG(IK)*CG(IK))
       !        COEF4(IK) = SUM(BRLAMBDA((IK-1)*NTH+1:IK*NTH) * DTH) *(2*PI/K(IK)) *  &
       !                    SSDSC(7) * DDEN(IK)/(DTH*SIG(IK)*CG(IK))
       !                   NB: SSDSC(7) is WHITECAPWIDTH
     END DO
     ! Need to extrapolate above NK if necessary ... to be added later.
-    DO IK=MIN(FLOOR(AAIRCMIN),NK),NK
+    DO IK=MIN(FLOOR(AAIRCMIN),NK)+1,NK ! +1 otherwise affects the resolved values.
       COEF4(IK)=0.
       COEF5(IK)=0.
     END DO
