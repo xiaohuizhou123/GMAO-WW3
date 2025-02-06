@@ -180,6 +180,7 @@
     if [ "$prop2D" = 'y' ]
     then
       echo ' ' >> matrix.body
+      echo "$rtst -s PR1_MPI_BIN2NC -w work_PR1_MPI_BIN2NC -f -p $mpi -n $np $ww3 ww3_tp2.2" >> matrix.body
       echo "$rtst -s PR1_MPI -w work_PR1_MPI              -f -p $mpi -n $np $ww3 ww3_tp2.1" >> matrix.body
       echo "$rtst -s PR1_MPI -w work_PR1_MPI              -f -p $mpi -n $np $ww3 ww3_tp2.2" >> matrix.body
       echo "$rtst -s PR1_MPI -w work_PR1_MPI              -f -p $mpi -n $np $ww3 ww3_tp2.3" >> matrix.body
@@ -1956,6 +1957,7 @@
     echo "$rtst                  -w work_IC4_M7                -i input_IC4_M7      $ww3 ww3_tic1.1" >> matrix.body
     echo "$rtst                  -w work_IC4_M8                -i input_IC4_M8      $ww3 ww3_tic1.1" >> matrix.body
     echo "$rtst                  -w work_IC4_M9                -i input_IC4_M9      $ww3 ww3_tic1.1" >> matrix.body
+    echo "$rtst                  -w work_IC4_M10               -i input_IC4_M10     $ww3 ww3_tic1.1" >> matrix.body
     echo "$rtst -g 1000m         -w work_IC5_M1                -i input_IC5_M1      $ww3 ww3_tic1.1" >> matrix.body
     echo "$rtst -g 1000m         -w work_IC5_M2                -i input_IC5_M2      $ww3 ww3_tic1.1" >> matrix.body
     echo "$rtst -g 1000m         -w work_IC5_M3                -i input_IC5_M3      $ww3 ww3_tic1.1" >> matrix.body
